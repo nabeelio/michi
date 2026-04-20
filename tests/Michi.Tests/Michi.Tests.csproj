@@ -22,7 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/MPath/MPath.csproj" />
+    <ProjectReference Include="..\..\src\Michi\Michi.csproj" />
   </ItemGroup>
 
 </Project>

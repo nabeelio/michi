@@ -8,9 +8,9 @@
     <File Path="README.md" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/MPath/MPath.csproj" />
+    <Project Path="src\Michi\Michi.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/MPath.Tests/MPath.Tests.csproj" />
+    <Project Path="tests\Michi.Tests\Michi.Tests.csproj" />
   </Folder>
 </Solution>

@@ -115,7 +115,7 @@ public class MPathConstructionTests {
 
         var opts = new MPathOptions {
             BaseDirectory = "/custom/base",
-            ExpandTilde = true,,
+            ExpandTilde = true,
         };
 
         var p = MPath.From("relative", opts);
@@ -130,7 +130,7 @@ public class MPathConstructionTests {
             return;
 
         var opts = MPathOptions.Default with {
-            BaseDirectory = "/opt/myapp",,
+            BaseDirectory = "/opt/myapp",
         };
 
         var p = MPath.From("data", opts);
