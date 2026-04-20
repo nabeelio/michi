@@ -1,0 +1,11 @@
+<Project>
+
+  <!-- Import parent Directory.Build.props -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!-- Suppress naming rules for test method names (underscores are idiomatic) -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+
+</Project>
