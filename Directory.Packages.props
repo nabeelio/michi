@@ -1,0 +1,35 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Libraries should NOT enable transitive pinning. See STACK.md §7. -->
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Test dependencies (xUnit v3 stack per CONTEXT D-38 REVISION).
+       xUnit v3 runs under the Microsoft Testing Platform (MTP). The VSTest
+       adapter that supports xUnit v3 ships as `xunit.runner.visualstudio`
+       on its 3.x line (there is no `xunit.v3.runner.visualstudio` package —
+       verified against nuget.org 2026-04-20). The xUnit v3 runtime package
+       is `xunit.v3` (not the legacy v2 `xunit` name). coverlet.collector 10.x
+       is MTP-aligned. Microsoft.NET.Test.Sdk is kept at the current 18.x
+       stable (the "10.x MTP-aligned" line described in the plan's CONTEXT
+       does not exist on NuGet — Test.Sdk only ships in the 17.x/18.x
+       streams; 18.x is compatible with MTP when
+       UseMicrosoftTestingPlatformRunner=true). -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.0" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+  </ItemGroup>
+
+  <!-- Library runtime dependencies for older TFMs. System.Text.Json is in-box
+       on net8.0+ but ships as a package for netstandard2.1. The library
+       references System.Text.Json conditionally in src/MPath/MPath.csproj. -->
+  <ItemGroup>
+    <PackageVersion Include="System.Text.Json" Version="10.0.6" />
+  </ItemGroup>
+
+</Project>
