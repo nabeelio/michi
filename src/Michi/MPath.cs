@@ -67,15 +67,15 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             Depth = 0;
         } else {
             // Skip the root, then split remainder on '/'.
-            var belowRoot = _path.Substring(root.Length);
+            var belowRoot = _path[root.Length..];
             if (belowRoot.Length > 0 && belowRoot[0] == '/') {
-                belowRoot = belowRoot.Substring(1);
+                belowRoot = belowRoot[1..];
             }
 
             _segments = belowRoot.Split('/');
             Depth = _segments.Length;
 
-            var last = _segments[_segments.Length - 1];
+            var last = _segments[^1];
             Name = last;
 
             // Extension detection: rightmost '.' that is NOT the first character of the name.
