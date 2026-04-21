@@ -1,0 +1,16 @@
+# Dependabot handles GitHub Actions version updates only.
+# All .NET updates (nuget packages, global.json SDK, dotnet-tools.json) are
+# handled by Renovate — see renovate.json. Keeping the ecosystems disjoint
+# prevents overlapping PRs.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
