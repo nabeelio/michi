@@ -21,11 +21,12 @@
     <PackageVersion Include="MinVer" Version="6.0.0" />
   </ItemGroup>
 
-  <!-- Library runtime dependencies for older TFMs. System.Text.Json is in-box
-       on net8.0+ but ships as a package for netstandard2.1. The library references
-       System.Text.Json conditionally in src/Michi/Michi.csproj. -->
+  <!-- Library runtime dependencies for older TFMs. System.Text.Json and
+       System.Collections.Immutable are in-box on net6+ but ship as packages for
+       netstandard2.1. Referenced conditionally in src/Michi/Michi.csproj. -->
   <ItemGroup>
     <PackageVersion Include="System.Text.Json" Version="10.0.6" />
+    <PackageVersion Include="System.Collections.Immutable" Version="10.0.6" />
   </ItemGroup>
 
 </Project>

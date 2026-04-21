@@ -12,9 +12,12 @@ internal static class WellKnownPaths {
     /// <summary>Lazy <see cref="Environment.SpecialFolder.UserProfile" /> as an <see cref="MPath" />.</summary>
     public static readonly Lazy<MPath> Home = new(
         () => MPath.From(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)),
-        true
+        LazyThreadSafetyMode.ExecutionAndPublication
     );
 
     /// <summary>Lazy <see cref="Path.GetTempPath" /> as an <see cref="MPath" />.</summary>
-    public static readonly Lazy<MPath> Temp = new(() => MPath.From(Path.GetTempPath()), true);
+    public static readonly Lazy<MPath> Temp = new(
+        () => MPath.From(Path.GetTempPath()),
+        LazyThreadSafetyMode.ExecutionAndPublication
+    );
 }

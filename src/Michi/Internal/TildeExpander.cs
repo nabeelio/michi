@@ -64,22 +64,36 @@ internal static class TildeExpander {
             return Environment.ExpandEnvironmentVariables(path);
         }
 
+        // Fast path: no '$' anywhere means no expansion work to do. Most paths hit this.
+        var firstDollar = path.IndexOf('$');
+        if (firstDollar < 0) {
+            return path;
+        }
+
         // Unix: $VAR and ${VAR}. ${...} must close; otherwise the var name is [A-Za-z_][A-Za-z0-9_]*.
+        // We copy literal runs in one Append call per run instead of one char at a time.
         var sb = new StringBuilder(path.Length);
-        var i = 0;
+        sb.Append(path, 0, firstDollar);
+        var i = firstDollar;
+        var runStart = i;
+
         while (i < path.Length) {
-            var c = path[i];
-            if (c != '$') {
-                sb.Append(c);
+            if (path[i] != '$') {
                 i++;
 
                 continue;
             }
 
+            // Flush the literal run-up to this '$' before handling it.
+            if (i > runStart) {
+                sb.Append(path, runStart, i - runStart);
+            }
+
             // trailing '$' -- keep literal
             if (i + 1 >= path.Length) {
-                sb.Append(c);
+                sb.Append('$');
                 i++;
+                runStart = i;
 
                 continue;
             }
@@ -107,8 +121,9 @@ internal static class TildeExpander {
                 consumed = end - i;
             } else {
                 // '$' followed by something invalid for a var name -- keep '$' literal
-                sb.Append(c);
+                sb.Append('$');
                 i++;
+                runStart = i;
 
                 continue;
             }
@@ -127,6 +142,12 @@ internal static class TildeExpander {
 
             sb.Append(value);
             i += consumed;
+            runStart = i;
+        }
+
+        // Flush any trailing literal run.
+        if (runStart < path.Length) {
+            sb.Append(path, runStart, path.Length - runStart);
         }
 
         return sb.ToString();

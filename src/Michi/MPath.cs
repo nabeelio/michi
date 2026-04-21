@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -24,6 +25,11 @@ namespace Michi;
 public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     // Canonical forward-slash form. Derived values compute on demand via System.IO.Path.
     private readonly string _path;
+
+    // Lazy segment cache. Default ImmutableArray<string> is `IsDefault == true`; we use
+    // that as the "not yet computed" sentinel. First reader does the split, subsequent
+    // readers return the cached array. Races are benign (worst case: split runs twice).
+    private ImmutableArray<string> _segments;
 
     /// <summary>
     /// Trusted ctor for paths already produced by the normalizer, or derived from another
@@ -82,9 +88,22 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     }
 
     /// <summary>
-    /// Whether <see cref="Extension" /> is non-empty.
+    /// Whether this path has a file extension. Checks directly without materializing
+    /// the <see cref="Extension" /> substring.
     /// </summary>
-    public bool HasExtension => Extension.Length > 0;
+    public bool HasExtension {
+        get {
+            var name = Name;
+            if (name.Length == 0) {
+                return false;
+            }
+
+            var dot = name.LastIndexOf('.');
+
+            // dot > 0 matches the hidden-file rule: a leading dot doesn't count.
+            return dot > 0;
+        }
+    }
 
     /// <summary>Number of segments below the root. "/" is 0, "/a" is 1, "/a/b/c" is 3.</summary>
     public int Depth {
@@ -93,6 +112,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
                 return 0;
             }
 
+            #if NET8_0_OR_GREATER
+            return _path.AsSpan(Root.Length).Count('/') + 1;
+            #else
             var count = 0;
             for (var i = Root.Length; i < _path.Length; i++) {
                 if (_path[i] == '/') {
@@ -101,14 +123,25 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             }
 
             return count + 1;
+            #endif
         }
     }
 
-    /// <summary>Segments below the root, in order. Read-only; caller can't mutate internal state.</summary>
+    /// <summary>
+    /// Segments below the root, in order. Computed once on first access and cached. Read-only;
+    /// caller can't mutate internal state.
+    /// </summary>
     public IReadOnlyList<string> Segments {
         get {
+            var cached = _segments;
+            if (!cached.IsDefault) {
+                return cached;
+            }
+
             if (_path == Root) {
-                return Array.Empty<string>();
+                _segments = ImmutableArray<string>.Empty;
+
+                return _segments;
             }
 
             var below = _path.AsSpan(Root.Length);
@@ -116,7 +149,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
                 below = below[1..];
             }
 
-            return below.ToString().Split('/');
+            _segments = [..below.ToString().Split('/')];
+
+            return _segments;
         }
     }
 
@@ -427,10 +462,50 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             return left;
         }
 
+        // Fast path: if the segment has no internal separators, no `.` or `..` components, and
+        // no invalid path chars, we can skip the full normalizer and just append. The left side
+        // is already canonical, the segment is safe, so the result is canonical by construction.
+        // Covers the overwhelmingly common case: `base / "filename.ext"`.
+        if (IsSimpleSegment(trimmed.AsSpan())) {
+            var fastPath = left._path.Length > 0 && left._path[^1] == '/'
+                    ? left._path + trimmed
+                    : left._path + "/" + trimmed;
+
+            return new(fastPath, left.Root);
+        }
+
         var combined = left._path + "/" + trimmed;
         var result = PathNormalizer.Normalize(combined, MPathOptions.Default);
 
         return new(result.Normalized, result.Root);
+    }
+
+    // A "simple segment" is one where straight concatenation produces a canonical path:
+    // no directory separators, no `.` / `..` traversal components, no invalid chars.
+    private static bool IsSimpleSegment(ReadOnlySpan<char> segment)
+    {
+        // Empty / pure-dots rejected: "." and ".." need normalization.
+        if (segment.IsEmpty) {
+            return false;
+        }
+
+        if (segment is "." or "..") {
+            return false;
+        }
+
+        foreach (var c in segment) {
+            if (c is '/' or '\\') {
+                return false;
+            }
+
+            // Control chars are invalid in paths on every platform we target.
+            if (c < 0x20) {
+                return false;
+            }
+        }
+
+        // Invalid-char check against the platform's invalid-char set (Windows adds more).
+        return segment.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
     }
 
     /// <summary>
@@ -441,6 +516,11 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     {
         if (segments is null || segments.Length == 0) {
             return this;
+        }
+
+        // Short-circuit: one valid segment is just `this / segment` (which has its own fast path).
+        if (segments.Length == 1) {
+            return string.IsNullOrEmpty(segments[0]) ? this : this / segments[0];
         }
 
         var sb = new StringBuilder(_path);
