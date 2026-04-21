@@ -1,0 +1,148 @@
+name: Release
+
+# Triggered by pushing a tag matching v* (e.g., v1.0.0, v1.0.0-beta.1).
+# MinVer (configured in Directory.Build.props) interprets the tag as the
+# package version: v1.2.3 -> 1.2.3, v1.0.0-beta.1 -> 1.0.0-beta.1.
+#
+# Multi-package future: currently the workflow packs every <IsPackable>true</IsPackable>
+# project in Michi.slnx at the same version, so adding a sibling package
+# (e.g., Michi.FileSystem) requires zero workflow changes. If a sibling ever
+# needs to ship independently, see docs/development.md § Releasing for the
+# migration to per-package tags.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  id-token: write      # Azure OIDC federated login
+  contents: write      # Create GitHub Release
+  packages: write      # Push to GitHub Packages
+
+jobs:
+  # Cheap Ubuntu sanity pass before spending Windows minutes on signing.
+  # CI on main already validated this commit, but this guards against
+  # tags created on branches that didn't run CI.
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          cache: true
+          cache-dependency-path: |
+            **/Directory.Packages.props
+            **/*.csproj
+
+      - run: dotnet tool restore
+      - run: dotnet restore Michi.slnx
+      - run: dotnet build Michi.slnx -c Release --no-restore
+      - run: dotnet test tests/Michi.Tests/Michi.Tests.csproj -c Release --no-build
+
+  # Signing via dotnet/sign requires Windows (Authenticode tooling is Windows-only).
+  pack-sign-publish:
+    needs: validate
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          cache: true
+          cache-dependency-path: |
+            **/Directory.Packages.props
+            **/*.csproj
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore Michi.slnx
+
+      - name: Build
+        run: dotnet build Michi.slnx -c Release --no-restore
+
+      - name: Pack
+        run: dotnet pack Michi.slnx -c Release --no-build --output ./artifacts
+
+      - name: Verify tag matches MinVer-produced version
+        shell: pwsh
+        run: |
+          $expected = $env:GITHUB_REF_NAME.TrimStart('v')
+          $nupkgs = Get-ChildItem ./artifacts -Filter *.nupkg
+          if ($nupkgs.Count -eq 0) {
+            throw "No .nupkg produced in ./artifacts"
+          }
+          foreach ($pkg in $nupkgs) {
+            # MinVer appends version after the package id, e.g. Michi.1.2.3.nupkg
+            # Use a regex escape on the version so '.' matches literally.
+            $escaped = [regex]::Escape($expected)
+            if ($pkg.Name -notmatch "\.$escaped\.nupkg$") {
+              throw "Version mismatch: tag=$expected  nupkg=$($pkg.Name)"
+            }
+          }
+          Write-Host "Verified: all nupkg versions match tag $expected"
+
+      - name: Install CycloneDX
+        run: dotnet tool install --global CycloneDX
+
+      - name: Generate SBOM
+        run: dotnet-CycloneDX Michi.slnx --output ./artifacts --filename michi.cyclonedx.json --output-format Json
+
+      - name: Azure OIDC login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install dotnet/sign
+        run: dotnet tool install --global sign --prerelease
+
+      - name: Sign packages
+        shell: pwsh
+        run: |
+          sign code azure-key-vault `
+            *.nupkg `
+            --base-directory "${{ github.workspace }}/artifacts" `
+            --publisher-name "Nabeel Shahzad" `
+            --description "Michi: strongly-typed absolute paths for .NET" `
+            --description-url "https://github.com/nabeelio/Michi" `
+            --timestamp-url "http://timestamp.digicert.com" `
+            --azure-credential-type azure-cli `
+            --azure-key-vault-url "${{ secrets.KEY_VAULT_URL }}" `
+            --azure-key-vault-certificate "${{ secrets.KEY_VAULT_CERT_NAME }}"
+
+      - name: Publish to GitHub Packages
+        shell: pwsh
+        run: |
+          dotnet nuget push "./artifacts/*.nupkg" `
+            --source "https://nuget.pkg.github.com/nabeelio/index.json" `
+            --api-key "${{ secrets.GITHUB_TOKEN }}" `
+            --skip-duplicate
+
+      - name: Publish to NuGet.org
+        shell: pwsh
+        run: |
+          dotnet nuget push "./artifacts/*.nupkg" `
+            --source "https://api.nuget.org/v3/index.json" `
+            --api-key "${{ secrets.NUGET_API_KEY }}" `
+            --skip-duplicate
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./artifacts/*.nupkg
+            ./artifacts/*.snupkg
+            ./artifacts/michi.cyclonedx.json
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true
