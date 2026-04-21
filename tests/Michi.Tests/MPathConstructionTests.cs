@@ -25,7 +25,7 @@ public class MPathConstructionTests {
 
         var p = MPath.From(@"C:\foo\bar");
         p.ToUnixString().ShouldBe("C:/foo/bar");
-        p.ToNativeString().ShouldBe(@"C:\foo\bar");
+        p.ToString().ShouldBe(@"C:\foo\bar");
     }
 
     // Null path throws ArgumentNullException with a verbose actionable message.

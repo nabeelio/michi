@@ -7,6 +7,8 @@ using System.Text.Json.Serialization;
 using Michi.Converters;
 using Michi.Exceptions;
 using Michi.Internal;
+// Alias to disambiguate from the new instance-level Path property on MPath.
+using SysPath = System.IO.Path;
 
 namespace Michi;
 
@@ -15,15 +17,26 @@ namespace Michi;
 /// </summary>
 /// <remarks>
 /// Construct via <see cref="From(string, MPathOptions?)" /> or <see cref="TryFrom" />.
-/// The canonical internal form is forward-slash; <see cref="ToString" /> returns the
-/// same canonical form for deterministic logging. Use <see cref="ToNativeString" />
-/// when you specifically need OS-native separators.
+/// The internal canonical form is forward-slash; <see cref="ToString" /> and the
+/// <see cref="Path" /> property both return the OS-native-separator form (backslash
+/// on Windows, forward-slash elsewhere) so paths drop into `System.IO` and most
+/// third-party string-typed APIs without extra conversion. Use <see cref="ToUnixString" />
+/// when you need a deterministic, platform-independent string (logging, JSON, snapshots).
 /// </remarks>
 [DebuggerDisplay("{ToString(),nq}")]
 [JsonConverter(typeof(MPathJsonConverter))]
 [TypeConverter(typeof(MPathTypeConverter))]
 public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
+    // Directory separator characters, cached so IndexOfAny calls don't allocate a new
+    // char[] on every invocation.
+    private static readonly char[] DirectorySeparators = [
+        '/',
+        '\\',
+    ];
+
     // Canonical forward-slash form. Derived values compute on demand via System.IO.Path.
+    // The OS-native form is stored as the Path auto-property below and assigned once
+    // in the ctor so ToString()/Path are O(1) allocation-free per CORE-05 + D-03.
     private readonly string _path;
 
     // Lazy segment cache. Default ImmutableArray<string> is `IsDefault == true`; we use
@@ -38,6 +51,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     private MPath(string normalizedPath, string root)
     {
         _path = normalizedPath;
+        Path = HostOs.IsWindows ? normalizedPath.Replace('/', '\\') : normalizedPath;
         Root = root;
     }
 
@@ -50,7 +64,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// <summary>
     /// The final segment (file or directory name). Empty string if this path is the root.
     /// </summary>
-    public string Name => _path == Root ? string.Empty : Path.GetFileName(_path);
+    public string Name => _path == Root ? string.Empty : SysPath.GetFileName(_path);
 
     /// <summary>
     /// Final segment without the extension. "foo.txt" gives "foo"; ".bashrc" gives ".bashrc"
@@ -105,7 +119,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         }
     }
 
-    /// <summary>Number of segments below the root. "/" is 0, "/a" is 1, "/a/b/c" is 3.</summary>
+    /// <summary>
+    /// Number of segments below the root. "/" is 0, "/a" is 1, "/a/b/c" is 3.
+    /// </summary>
     public int Depth {
         get {
             if (_path == Root) {
@@ -139,7 +155,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             }
 
             if (_path == Root) {
-                _segments = ImmutableArray<string>.Empty;
+                _segments = [];
 
                 return _segments;
             }
@@ -149,7 +165,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
                 below = below[1..];
             }
 
-            _segments = [..below.ToString().Split('/')];
+            _segments = [
+                ..below.ToString().Split('/'),
+            ];
 
             return _segments;
         }
@@ -169,7 +187,12 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </exception>
     public static MPath From(string path, MPathOptions? options = null)
     {
-        Guard.NotNull(path, nameof(path), "Path cannot be null. Use TryFrom to accept null input without exceptions.");
+        Guard.NotNull(
+            path,
+            nameof(path),
+            "Path cannot be null. Use TryFrom to accept null input without exceptions."
+        );
+
         var result = PathNormalizer.Normalize(path, options ?? MPathOptions.Default);
 
         return new(result.Normalized, result.Root);
@@ -187,7 +210,12 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </exception>
     public static MPath From(string path, string relativeTo, MPathOptions? options = null)
     {
-        Guard.NotNull(path, nameof(path), "Path cannot be null. Use TryFrom to accept null input without exceptions.");
+        Guard.NotNull(
+            path,
+            nameof(path),
+            "Path cannot be null. Use TryFrom to accept null input without exceptions."
+        );
+
         Guard.NotNull(
             relativeTo,
             nameof(relativeTo),
@@ -231,12 +259,18 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </summary>
     /// <remarks>
     /// <strong>Security:</strong> unvetted user input in <paramref name="args" /> can inject
-    /// <c>..</c> segments that escape the intended base. For untrusted input, compose via the
-    /// <c>/</c> operator (which strips leading separators) and validate the result.
+    /// `..` segments that escape the intended base. For untrusted input, compose via the
+    /// `/` operator (which strips leading separators) and validate the result.
     /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="template" /> is null.</exception>
-    /// <exception cref="InvalidPathException">The substituted result is not a valid path.</exception>
-    /// <exception cref="FormatException"><paramref name="template" /> is malformed.</exception>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="template" /> is null.
+    /// </exception>
+    /// <exception cref="InvalidPathException">
+    /// The substituted result is not a valid path.
+    /// </exception>
+    /// <exception cref="FormatException">
+    /// <paramref name="template" /> is malformed.
+    /// </exception>
     public static MPath Format(string template, params object?[] args)
     {
         Guard.NotNull(
@@ -247,7 +281,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 
         var substituted = string.Format(CultureInfo.InvariantCulture, template, args);
 
-        var badIndex = substituted.IndexOfAny(Path.GetInvalidPathChars());
+        var badIndex = substituted.IndexOfAny(SysPath.GetInvalidPathChars());
         if (badIndex >= 0) {
             var ch = substituted[badIndex];
             var display = char.IsControl(ch) ? ' ' : ch;
@@ -266,19 +300,32 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 #region String output
 
     /// <summary>
-    /// Canonical forward-slash form, deterministic across platforms. Use
-    /// <see cref="ToNativeString" /> when OS-native separators are required.
+    /// OS-native separator form: `/foo/bar` on Unix, `\foo\bar` on Windows.
+    /// Precomputed at construction, so this is O(1) and allocation-free.
     /// </summary>
-    public override string ToString() => _path;
+    /// <remarks>
+    /// For deterministic output across platforms (logging, JSON, snapshots, hashes), use
+    /// <see cref="ToUnixString" /> instead. The <see cref="Path" /> property returns the
+    /// same value as this method and is preferred in LINQ projections and data binding.
+    /// </remarks>
+    public override string ToString() => Path;
 
     /// <summary>
-    /// OS-native separator form. "/foo/bar" on Unix; "\foo\bar" on Windows.
-    /// Computed on demand -- no per-instance caching.
+    /// The path as a string, in OS-native separator form. Equivalent to <see cref="ToString" />;
+    /// provided as a property for LINQ projections, data binding, and pass-through to
+    /// string-typed APIs.
     /// </summary>
-    public string ToNativeString() => HostOs.IsWindows ? _path.Replace('/', '\\') : _path;
+    /// <example>
+    ///     <code>
+    /// File.ReadAllText(myPath.Path);
+    /// var names = paths.Select(p => p.Path);
+    /// </code>
+    /// </example>
+    public string Path { get; }
 
     /// <summary>
-    /// Forward-slash form, portable across platforms. Alias for <see cref="ToString" />.
+    /// Forward-slash form, identical on every platform. Use this when you need a stable,
+    /// deterministic string (logs you diff across OSes, JSON payloads, cache keys).
     /// </summary>
     public string ToUnixString() => _path;
 
@@ -286,12 +333,6 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// Backslash form. Useful when targeting Windows-specific APIs from a non-Windows build.
     /// </summary>
     public string ToWindowsString() => _path.Replace('/', '\\');
-
-    /// <summary>
-    /// Explicit cast to the native-string form (same as <see cref="ToNativeString" />).
-    /// Returns null for null input.
-    /// </summary>
-    public static explicit operator string?(MPath? path) => path?.ToNativeString();
 
 #endregion
 
@@ -306,6 +347,59 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// System temporary directory. Computed once at first access.
     /// </summary>
     public static MPath Temp => WellKnownPaths.Temp.Value;
+
+    /// <summary>
+    /// Directory containing the running application's main assembly. Stable across
+    /// framework-dependent, self-contained, single-file, and test-host deployments.
+    /// </summary>
+    /// <remarks>
+    /// Resolves via <see cref="AppContext.BaseDirectory" />. Not the same as
+    /// <see cref="CurrentDirectory" /> -- the CWD is mutable and launch-context dependent;
+    /// the installed directory is fixed for the process lifetime.
+    /// </remarks>
+    public static MPath InstalledDirectory => WellKnownPaths.InstalledDirectory.Value;
+
+    /// <summary>
+    /// Per-user application data intended to follow the user across machines. On Windows
+    /// with a roaming profile, contents sync at logon/logoff; macOS and Linux have no
+    /// roaming concept, so this is effectively user-local on those platforms.
+    /// </summary>
+    /// <remarks>
+    /// Resolves via <see cref="Environment.SpecialFolder.ApplicationData" />:
+    /// Windows → `%APPDATA%` (e.g. `C:\Users\{user}\AppData\Roaming`);
+    /// macOS → `~/Library/Application Support` (same path as <see cref="LocalApplicationData" />);
+    /// Linux → `$XDG_CONFIG_HOME`, else `~/.config`.
+    /// Callers should create a subdirectory named after their application rather than write
+    /// files directly here. Computed once at first access.
+    /// </remarks>
+    public static MPath ApplicationData => WellKnownPaths.ApplicationData.Value;
+
+    /// <summary>
+    /// Per-user, machine-local application data. Appropriate for caches, machine-specific
+    /// configuration, and data that should not roam across machines.
+    /// </summary>
+    /// <remarks>
+    /// Resolves via <see cref="Environment.SpecialFolder.LocalApplicationData" />:
+    /// Windows → `%LOCALAPPDATA%` (e.g. `C:\Users\{user}\AppData\Local`);
+    /// macOS → `~/Library/Application Support` (same path as <see cref="ApplicationData" />);
+    /// Linux → `$XDG_DATA_HOME`, else `~/.local/share`.
+    /// Callers should create a subdirectory named after their application rather than write
+    /// files directly here. Computed once at first access.
+    /// </remarks>
+    public static MPath LocalApplicationData => WellKnownPaths.LocalApplicationData.Value;
+
+    /// <summary>
+    /// Machine-wide application data shared by all users of the system. Writes typically
+    /// require elevated privileges.
+    /// </summary>
+    /// <remarks>
+    /// Resolves via <see cref="Environment.SpecialFolder.CommonApplicationData" />:
+    /// Windows → `%ProgramData%` (e.g. `C:\ProgramData`);
+    /// macOS and Linux → `/usr/share`.
+    /// Callers should create a subdirectory named after their application rather than write
+    /// files directly here. Computed once at first access.
+    /// </remarks>
+    public static MPath CommonApplicationData => WellKnownPaths.CommonApplicationData.Value;
 
     /// <summary>
     /// Process current working directory. Evaluated on every access -- the process CWD is mutable.
@@ -402,12 +496,17 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         var lastSlash = _path.LastIndexOf('/');
         var parentPath = lastSlash < Root.Length ? Root : _path[..lastSlash];
         parent = new(parentPath, Root); // substring of already-normalized path
+
         return true;
     }
 
-    /// <summary>Walks <paramref name="levels" /> levels up the parent chain. <c>Up(0)</c> returns this.</summary>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="levels" /> is negative.</exception>
-    /// <exception cref="NoParentException"><paramref name="levels" /> exceeds <see cref="Depth" />.</exception>
+    /// <summary>Walks <paramref name="levels" /> levels up the parent chain. `Up(0)` returns this.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="levels" /> is negative.
+    /// </exception>
+    /// <exception cref="NoParentException">
+    /// <paramref name="levels" /> exceeds <see cref="Depth" />.
+    /// </exception>
     public MPath Up(int levels)
     {
         if (levels < 0) {
@@ -443,11 +542,15 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// Leading separators on the RHS are stripped, so the RHS is always treated as relative.
     /// </summary>
     /// <remarks>
-    /// The segment can contain additional separators and <c>..</c>. After normalization the result
+    /// The segment can contain additional separators and `..`. After normalization the result
     /// may escape <paramref name="left" />. For untrusted input, validate the result.
     /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="left" /> or <paramref name="segment" /> is null.</exception>
-    /// <exception cref="InvalidPathException">The joined path is not a valid absolute path.</exception>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="left" /> or <paramref name="segment" /> is null.
+    /// </exception>
+    /// <exception cref="InvalidPathException">
+    /// The joined path is not a valid absolute path.
+    /// </exception>
     public static MPath operator /(MPath left, string segment)
     {
         Guard.NotNull(left, nameof(left), "Left-hand operand of the / operator cannot be null.");
@@ -505,7 +608,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         }
 
         // Invalid-char check against the platform's invalid-char set (Windows adds more).
-        return segment.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+        return segment.IndexOfAny(SysPath.GetInvalidFileNameChars()) < 0;
     }
 
     /// <summary>
@@ -565,7 +668,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             throw new InvalidPathException(name, "Name is empty. Pass a non-empty segment string");
         }
 
-        if (name.IndexOfAny(['/', '\\']) >= 0) {
+        if (name.IndexOfAny(DirectorySeparators) >= 0) {
             throw new InvalidPathException(
                 name,
                 $"Name '{name}' contains a directory separator. Use the / operator or Join() to compose multi-segment paths."
@@ -608,7 +711,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         }
 
         var ext = extension[0] == '.' ? extension : "." + extension;
-        if (ext.IndexOfAny(['/', '\\']) >= 0) {
+        if (ext.IndexOfAny(DirectorySeparators) >= 0) {
             throw new InvalidPathException(
                 ext,
                 $"Extension '{ext}' contains a directory separator. Extensions cannot span directories; use WithName to change the file segment."

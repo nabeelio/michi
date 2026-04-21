@@ -5,10 +5,10 @@ using Xunit;
 namespace Michi.Tests;
 
 public class MPathStringOutputTests {
-    // ToString returns the canonical forward-slash form on every platform (deterministic
-    // for logging). Use ToNativeString when OS-native separators are required.
+    // ToString returns the OS-native separator form on every platform (CORE-05 + D-19).
+    // Use ToUnixString when deterministic cross-platform output is required.
     [Fact]
-    public void ToString_ReturnsCanonicalForwardSlash_OnUnix()
+    public void ToString_UsesOsNativeSeparators_OnUnix()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
@@ -17,30 +17,48 @@ public class MPathStringOutputTests {
     }
 
     [Fact]
-    public void ToString_ReturnsCanonicalForwardSlash_OnWindows()
+    public void ToString_UsesOsNativeSeparators_OnWindows()
     {
         if (!PlatformTestHelpers.IsWindows)
             return;
 
-        MPath.From(@"C:\a\b").ToString().ShouldBe("C:/a/b");
+        MPath.From(@"C:\a\b").ToString().ShouldBe(@"C:\a\b");
     }
 
+    // Path property returns the same value as ToString -- it's the ergonomic alias for
+    // LINQ / data-binding / string-typed API call sites.
     [Fact]
-    public void ToNativeString_ReturnsOsNativeSeparators_OnUnix()
+    public void Path_ReturnsSameAsToString_OnUnix()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
 
-        MPath.From("/a/b/c").ToNativeString().ShouldBe("/a/b/c");
+        var p = MPath.From("/a/b/c");
+        p.Path.ShouldBe(p.ToString());
+        p.Path.ShouldBe("/a/b/c");
     }
 
     [Fact]
-    public void ToNativeString_ReturnsOsNativeSeparators_OnWindows()
+    public void Path_ReturnsSameAsToString_OnWindows()
     {
         if (!PlatformTestHelpers.IsWindows)
             return;
 
-        MPath.From(@"C:\a\b").ToNativeString().ShouldBe(@"C:\a\b");
+        var p = MPath.From(@"C:\a\b");
+        p.Path.ShouldBe(p.ToString());
+        p.Path.ShouldBe(@"C:\a\b");
+    }
+
+    // Path and ToString return the same string reference on repeat access -- the
+    // OS-native form is precomputed at construction (D-03). Capturing to a local
+    // first avoids ReSharper's EqualExpressionComparison warning on `p.Path == p.Path`.
+    [Fact]
+    public void Path_IsReferenceStable_AcrossCalls()
+    {
+        var p = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\a\b" : "/a/b");
+        var first = p.Path;
+        ReferenceEquals(first, p.Path).ShouldBeTrue();
+        ReferenceEquals(first, p.ToString()).ShouldBeTrue();
     }
 
     // ToUnixString always uses forward slashes.
@@ -63,24 +81,5 @@ public class MPathStringOutputTests {
         } else {
             MPath.From("/a/b").ToWindowsString().ShouldBe(@"\a\b");
         }
-    }
-
-    // Explicit cast returns the OS-native string form.
-    [Fact]
-    public void ExplicitCast_ReturnsNativeString()
-    {
-        if (PlatformTestHelpers.IsWindows)
-            return;
-
-        var p = MPath.From("/a/b");
-        ((string?) p).ShouldBe("/a/b");
-    }
-
-    // Explicit cast on null returns null.
-    [Fact]
-    public void ExplicitCast_OnNull_ReturnsNull()
-    {
-        MPath? p = null;
-        ((string?) p).ShouldBeNull();
     }
 }
