@@ -5,12 +5,17 @@ using Michi.Exceptions;
 namespace Michi.Converters;
 
 /// <summary>
-/// <see cref="System.Text.Json" /> converter for <see cref="MPath" />. Serializes to
-/// the canonical forward-slash string form; deserializes via <see cref="MPath.From(string, MPathOptions?)" />.
+/// <see cref="System.Text.Json" /> converter for <see cref="MPath" />. Serializes to the
+/// canonical forward-slash string form (via <see cref="MPath.ToUnixString" />) so payloads
+/// are portable across Windows, macOS, and Linux; deserializes via
+/// <see cref="MPath.From(string, MPathOptions?)" />.
 /// </summary>
 /// <remarks>
-/// Registered automatically via <see cref="JsonConverterAttribute" /> on <see cref="MPath" />
-/// -- callers do not need to add this converter to <see cref="JsonSerializerOptions.Converters" />.
+/// Forward-slash output is deliberate and independent of host OS: without it, an MPath
+/// serialized on Windows would contain backslashes, which JSON consumers on Unix would
+/// then treat as escape characters. Registered automatically via
+/// <see cref="JsonConverterAttribute" /> on <see cref="MPath" /> -- callers do not need to
+/// add this converter to <see cref="JsonSerializerOptions.Converters" />.
 /// </remarks>
 internal sealed class MPathJsonConverter : JsonConverter<MPath> {
     public override MPath? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -36,5 +41,5 @@ internal sealed class MPathJsonConverter : JsonConverter<MPath> {
     }
 
     public override void Write(Utf8JsonWriter writer, MPath value, JsonSerializerOptions options) =>
-            writer.WriteStringValue(value.ToString());
+            writer.WriteStringValue(value.ToUnixString());
 }
