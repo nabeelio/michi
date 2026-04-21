@@ -11,11 +11,7 @@ namespace Michi.Converters;
 
 /// <summary>
 /// <see cref="TypeConverter" /> for <see cref="MPath" />. Supports round-tripping via the
-/// canonical string form -- used by
-/// <c>
-/// IConfiguration
-/// </c>
-/// binding, ASP.NET model binding,
+/// canonical string form -- used by `IConfiguration` binding, ASP.NET model binding,
 /// WPF property grids, and any framework that resolves converters via <see cref="TypeDescriptor" />.
 /// </summary>
 internal sealed class MPathTypeConverter : TypeConverter {

@@ -16,7 +16,7 @@ namespace Michi.Internal;
 internal readonly record struct NormalizationResult(string Normalized, string Root);
 
 /// <summary>
-/// Canonicalizes paths: resolves <c>..</c>/<c>.</c> segments, collapses repeated separators, resolves
+/// Canonicalizes paths: resolves `..`/`.` segments, collapses repeated separators, resolves
 /// relative paths against a rooted base, extracts the root prefix.
 /// </summary>
 /// <remarks>
@@ -31,8 +31,8 @@ internal static class PathNormalizer {
     /// </exception>
     internal static NormalizationResult Normalize(string path, MPathOptions options, string? relativeTo = null)
     {
-        Guard.NotNull(path, nameof(path));
-        Guard.NotNull(options, nameof(options));
+        Guard.NotNull(path);
+        Guard.NotNull(options);
 
         var attempted = path;
 

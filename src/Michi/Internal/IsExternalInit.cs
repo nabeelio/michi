@@ -10,7 +10,7 @@ using System.ComponentModel;
 // ReSharper disable once CheckNamespace -- polyfill MUST live in the BCL namespace for the compiler to recognize it.
 namespace System.Runtime.CompilerServices;
 
-/// <summary>Compiler-required marker for <c>init</c> setters; polyfilled on netstandard2.1.</summary>
+/// <summary>Compiler-required marker for `init` setters; polyfilled on netstandard2.1.</summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
 internal static class IsExternalInit;
 #endif

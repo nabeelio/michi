@@ -4,18 +4,18 @@ using Michi.Exceptions;
 namespace Michi.Internal;
 
 /// <summary>
-/// Tilde (<c>~</c>) and env-var expansion. Only runs when the matching <see cref="MPathOptions" />
-/// flag is <c>true</c>. Errors surface as <see cref="InvalidPathException" />.
+/// Tilde (`~`) and env-var expansion. Only runs when the matching <see cref="MPathOptions" />
+/// flag is `true`. Errors surface as <see cref="InvalidPathException" />.
 /// </summary>
 internal static class TildeExpander {
     /// <summary>
-    /// If <paramref name="path" /> is <c>~</c> or starts with <c>~/</c> (or <c>~\</c>), replaces the
+    /// If <paramref name="path" /> is `~` or starts with `~/` (or `~\`), replaces the
     /// tilde with <see cref="Environment.SpecialFolder.UserProfile" />. Throws
     /// <see cref="InvalidPathException" /> if the host has no user-profile folder.
     /// </summary>
     internal static string ExpandTilde(string path)
     {
-        Guard.NotNull(path, nameof(path));
+        Guard.NotNull(path);
 
         // Only expand bare "~" or "~/" prefix. "~user/foo" (another user's home) is a Unix shell
         // concept and isn't supported.
@@ -51,13 +51,13 @@ internal static class TildeExpander {
     }
 
     /// <summary>
-    /// Expands env-var references. Windows delegates <c>%VAR%</c> to
+    /// Expands env-var references. Windows delegates `%VAR%` to
     /// <see cref="Environment.ExpandEnvironmentVariables" /> (undefined vars stay literal per BCL contract).
-    /// Unix parses <c>$VAR</c> and <c>${VAR}</c>; undefined vars throw <see cref="InvalidPathException" />.
+    /// Unix parses `$VAR` and `${VAR}`; undefined vars throw <see cref="InvalidPathException" />.
     /// </summary>
     internal static string ExpandEnvironmentVariables(string path)
     {
-        Guard.NotNull(path, nameof(path));
+        Guard.NotNull(path);
 
         if (HostOs.IsWindows) {
             // BCL contract: undefined "%VAR%" stays literal. Don't override -- Windows consumers expect it.
