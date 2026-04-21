@@ -29,4 +29,12 @@
     <PackageVersion Include="System.Collections.Immutable" Version="10.0.6" />
   </ItemGroup>
 
+  <!-- Source-only polyfills for modern C# features (CallerArgumentExpression, IsExternalInit,
+       nullability annotations, etc.) so we can use latest C# on netstandard2.1 without
+       hand-rolling per-attribute polyfill files. Consumed build-time only via PrivateAssets=all
+       in src/Michi/Michi.csproj. Does not appear in consumer dependency graphs. -->
+  <ItemGroup>
+    <PackageVersion Include="PolySharp" Version="1.15.0" />
+  </ItemGroup>
+
 </Project>
