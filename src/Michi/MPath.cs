@@ -60,7 +60,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             // dot > 0 excludes the leading-dot case (hidden files).
             var dot = name.LastIndexOf('.');
 
-            return dot > 0 ? name.Substring(0, dot) : name;
+            return dot > 0 ? name[..dot] : name;
         }
     }
 
@@ -77,7 +77,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 
             var dot = name.LastIndexOf('.');
 
-            return dot > 0 ? name.Substring(dot) : string.Empty;
+            return dot > 0 ? name[dot..] : string.Empty;
         }
     }
 
@@ -365,7 +365,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         }
 
         var lastSlash = _path.LastIndexOf('/');
-        var parentPath = lastSlash < Root.Length ? Root : _path.Substring(0, lastSlash);
+        var parentPath = lastSlash < Root.Length ? Root : _path[..lastSlash];
         parent = new(parentPath, Root); // substring of already-normalized path
         return true;
     }
@@ -500,7 +500,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         }
 
         var lastSlash = _path.LastIndexOf('/');
-        var parentPath = lastSlash < Root.Length ? Root : _path.Substring(0, lastSlash);
+        var parentPath = lastSlash < Root.Length ? Root : _path[..lastSlash];
         // Parent is already normalized, name is validated, so no re-normalization needed.
         var combined = parentPath.EndsWith('/') ? parentPath + name : parentPath + "/" + name;
 

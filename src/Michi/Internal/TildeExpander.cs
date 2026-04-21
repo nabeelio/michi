@@ -30,7 +30,7 @@ internal static class TildeExpander {
             #if NET6_0_OR_GREATER
             return string.Concat(home.AsSpan(), path.AsSpan(1));
             #else
-            return home + path.Substring(1);
+            return home + path[1..];
             #endif
         }
 
@@ -96,14 +96,14 @@ internal static class TildeExpander {
                     );
                 }
 
-                varName = path.Substring(i + 2, end - (i + 2));
+                varName = path[(i + 2)..end];
                 consumed = end - i + 1;
             } else if (IsVarNameStart(next)) {
                 var end = i + 2;
                 while (end < path.Length && IsVarNameContinuation(path[end]))
                     end++;
 
-                varName = path.Substring(i + 1, end - (i + 1));
+                varName = path[(i + 1)..end];
                 consumed = end - i;
             } else {
                 // '$' followed by something invalid for a var name -- keep '$' literal
