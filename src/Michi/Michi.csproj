@@ -9,16 +9,13 @@
   </PropertyGroup>
 
   <!-- System.Text.Json is in-box on net8.0+ but ships as a NuGet package on
-       netstandard2.1 — needed for the [JsonConverter] attribute on MPath and
-       the MPathJsonConverter stub. -->
+       netstandard2.1. Needed for the [JsonConverter] attribute on MPath and
+       MPathJsonConverter. -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">
     <PackageReference Include="System.Text.Json" />
   </ItemGroup>
 
-  <!-- Packaged README — the file itself is produced in Phase 5; keep the ItemGroup
-       so the Directory.Build.props <PackageReadmeFile>README.md</PackageReadmeFile>
-       contract is honored once the file exists. Until then the Pack item below
-       is a soft reference. -->
+  <!-- Packaged README surfaces on nuget.org. Optional until the file exists. -->
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)../../README.md')" />
   </ItemGroup>

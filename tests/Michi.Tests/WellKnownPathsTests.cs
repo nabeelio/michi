@@ -3,59 +3,38 @@ using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: WELL-01 — Home / Temp / CurrentDirectory well-known paths
+// Trivial "Home matches UserProfile" / "Temp matches GetTempPath" tests are omitted --
+// they duplicate the constructors. What remains pins the two behavioral contracts that
+// actually matter: Home/Temp are cached singletons; CurrentDirectory is NOT cached.
 public class WellKnownPathsTests {
-    // WELL-01 + D-30: Home returns the same instance on repeat access (lazy singleton)
+    // Home and Temp are lazy singletons (same instance on repeat access).
     [Fact]
-    public void Home_ReturnsSameInstanceOnRepeatAccess()
+    public void HomeAndTemp_AreLazySingletons()
     {
-        var a = MPath.Home;
-        var b = MPath.Home;
-        ReferenceEquals(a, b).ShouldBeTrue();
+        var homeA = MPath.Home;
+        var homeB = MPath.Home;
+        ReferenceEquals(homeA, homeB).ShouldBeTrue();
+
+        var tempA = MPath.Temp;
+        var tempB = MPath.Temp;
+        ReferenceEquals(tempA, tempB).ShouldBeTrue();
     }
 
-    // WELL-01 + D-31: Temp returns the same instance on repeat access (lazy singleton)
-    [Fact]
-    public void Temp_ReturnsSameInstanceOnRepeatAccess()
-    {
-        var a = MPath.Temp;
-        var b = MPath.Temp;
-        ReferenceEquals(a, b).ShouldBeTrue();
-    }
-
-    // WELL-01 + D-32 + PITFALLS m-23: CurrentDirectory is evaluated on every access, NOT cached
+    // CurrentDirectory is evaluated on every access, NOT cached -- guards against the
+    // stale-CWD bug pattern where a cached value silently goes out of date after a
+    // Directory.SetCurrentDirectory call.
     [Fact]
     public void CurrentDirectory_IsReevaluatedOnEachAccess()
     {
         var originalCwd = Directory.GetCurrentDirectory();
         try {
             var first = MPath.CurrentDirectory;
-            var newCwd = Path.GetTempPath();
-            Directory.SetCurrentDirectory(newCwd);
+            Directory.SetCurrentDirectory(Path.GetTempPath());
             var second = MPath.CurrentDirectory;
-            first.Equals(second).ShouldBeFalse(); // they point to different directories now
+            first.Equals(second).ShouldBeFalse();
         }
         finally {
             Directory.SetCurrentDirectory(originalCwd);
         }
-    }
-
-    // WELL-01: Home matches Environment.GetFolderPath(UserProfile)
-    [Fact]
-    public void Home_MatchesUserProfile()
-    {
-        var expected = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        MPath.Home.ToString().ShouldBe(MPath.From(expected).ToString());
-    }
-
-    // WELL-01: Temp matches Path.GetTempPath (modulo trailing-slash normalization)
-    [Fact]
-    public void Temp_MatchesPathGetTempPath()
-    {
-        var tempStr = MPath.Temp.ToString();
-        tempStr.Length.ShouldBeGreaterThan(0);
-        // MPath normalizes trailing slashes; either matches Path.GetTempPath sans trailing, or IS the system temp root
-        var systemTemp = Path.GetTempPath();
-        systemTemp.Replace('\\', '/').TrimEnd('/').ShouldBe(MPath.Temp.ToUnixString());
     }
 }

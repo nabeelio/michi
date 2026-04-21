@@ -4,11 +4,11 @@ using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: CORE-05 — ToString / ToUnixString / ToWindowsString / explicit string cast
 public class MPathStringOutputTests {
-    // CORE-05 + D-19: ToString returns OS-native separators on Unix
+    // ToString returns the canonical forward-slash form on every platform (deterministic
+    // for logging). Use ToNativeString when OS-native separators are required.
     [Fact]
-    public void ToString_UsesOsNativeSeparators_OnUnix()
+    public void ToString_ReturnsCanonicalForwardSlash_OnUnix()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
@@ -16,17 +16,34 @@ public class MPathStringOutputTests {
         MPath.From("/a/b/c").ToString().ShouldBe("/a/b/c");
     }
 
-    // CORE-05 + D-19: ToString returns OS-native separators on Windows
     [Fact]
-    public void ToString_UsesOsNativeSeparators_OnWindows()
+    public void ToString_ReturnsCanonicalForwardSlash_OnWindows()
     {
         if (!PlatformTestHelpers.IsWindows)
             return;
 
-        MPath.From(@"C:\a\b").ToString().ShouldBe(@"C:\a\b");
+        MPath.From(@"C:\a\b").ToString().ShouldBe("C:/a/b");
     }
 
-    // CORE-05 + D-20: ToUnixString always uses forward slashes
+    [Fact]
+    public void ToNativeString_ReturnsOsNativeSeparators_OnUnix()
+    {
+        if (PlatformTestHelpers.IsWindows)
+            return;
+
+        MPath.From("/a/b/c").ToNativeString().ShouldBe("/a/b/c");
+    }
+
+    [Fact]
+    public void ToNativeString_ReturnsOsNativeSeparators_OnWindows()
+    {
+        if (!PlatformTestHelpers.IsWindows)
+            return;
+
+        MPath.From(@"C:\a\b").ToNativeString().ShouldBe(@"C:\a\b");
+    }
+
+    // ToUnixString always uses forward slashes.
     [Fact]
     public void ToUnixString_AlwaysForwardSlash()
     {
@@ -37,7 +54,7 @@ public class MPathStringOutputTests {
         }
     }
 
-    // CORE-05 + D-21: ToWindowsString always uses backslashes
+    // ToWindowsString always uses backslashes.
     [Fact]
     public void ToWindowsString_AlwaysBackslash()
     {
@@ -48,22 +65,22 @@ public class MPathStringOutputTests {
         }
     }
 
-    // CORE-05 + D-22: explicit cast calls ToString
+    // Explicit cast returns the OS-native string form.
     [Fact]
-    public void ExplicitCast_CallsToString()
+    public void ExplicitCast_ReturnsNativeString()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
 
         var p = MPath.From("/a/b");
-        ((string) p).ShouldBe("/a/b");
+        ((string?) p).ShouldBe("/a/b");
     }
 
-    // CORE-05 + D-22: explicit cast on null returns null (C# cast-null semantics)
+    // Explicit cast on null returns null.
     [Fact]
     public void ExplicitCast_OnNull_ReturnsNull()
     {
         MPath? p = null;
-        ((string?) p!).ShouldBeNull();
+        ((string?) p).ShouldBeNull();
     }
 }

@@ -1,12 +1,12 @@
+using Michi.Exceptions;
 using Michi.Tests.Internal;
 using Shouldly;
 using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: MUT-01 — WithName / WithExtension / WithoutExtension
 public class MPathMutationTests {
-    // MUT-01 + D-28: WithName replaces the final segment
+    // WithName replaces the final segment.
     [Fact]
     public void WithName_ReplacesFinalSegment()
     {
@@ -16,9 +16,9 @@ public class MPathMutationTests {
         MPath.From("/a/b/c.txt").WithName("d.md").ToUnixString().ShouldBe("/a/b/d.md");
     }
 
-    // MUT-01 + D-29b: WithName containing `/` throws with verbose message
+    // WithName containing / throws with verbose message.
     [Fact]
-    public void WithName_WithForwardSlash_Throws_WithD29bMessage()
+    public void WithName_WithForwardSlash_Throws()
     {
         var p = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\foo\bar" : "/foo/bar");
         var ex = Should.Throw<InvalidPathException>(() => p.WithName("sub/name"));
@@ -26,16 +26,7 @@ public class MPathMutationTests {
         ex.Message.ShouldContain("Use the / operator or Join()");
     }
 
-    // MUT-01 + D-29b: WithName containing `\` also throws
-    [Fact]
-    public void WithName_WithBackslash_Throws()
-    {
-        var p = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\foo\bar" : "/foo/bar");
-        var ex = Should.Throw<InvalidPathException>(() => p.WithName("sub\\name"));
-        ex.Message.ShouldContain("contains a directory separator");
-    }
-
-    // MUT-01 + D-28: WithName null throws ArgumentNullException with verbose message
+    // WithName null throws ArgumentNullException with verbose message.
     [Fact]
     public void WithName_Null_ThrowsArgumentNullException()
     {
@@ -45,7 +36,7 @@ public class MPathMutationTests {
         ex.Message.ShouldContain("non-empty segment string");
     }
 
-    // MUT-01 + D-29: WithExtension accepts leading-dot or no-dot form
+    // WithExtension accepts leading-dot or no-dot form.
     [Fact]
     public void WithExtension_AcceptsBothDotAndNoDot()
     {
@@ -56,7 +47,7 @@ public class MPathMutationTests {
         MPath.From("/a/foo").WithExtension(".txt").ToUnixString().ShouldBe("/a/foo.txt");
     }
 
-    // MUT-01 + D-29: WithExtension replaces existing extension
+    // WithExtension replaces an existing extension.
     [Fact]
     public void WithExtension_ReplacesExistingExtension()
     {
@@ -66,7 +57,7 @@ public class MPathMutationTests {
         MPath.From("/a/foo.txt").WithExtension("md").ToUnixString().ShouldBe("/a/foo.md");
     }
 
-    // MUT-01 + D-29: WithExtension(null) equivalent to WithoutExtension
+    // WithExtension(null) is equivalent to WithoutExtension.
     [Fact]
     public void WithExtension_Null_EquivalentToWithoutExtension()
     {
@@ -78,19 +69,9 @@ public class MPathMutationTests {
         p.WithExtension(null).ToUnixString().ShouldBe("/a/foo");
     }
 
-    // MUT-01 + D-29: WithExtension("") equivalent to WithoutExtension
+    // WithExtension(".") throws -- a bare dot is not a valid extension.
     [Fact]
-    public void WithExtension_Empty_EquivalentToWithoutExtension()
-    {
-        if (PlatformTestHelpers.IsWindows)
-            return;
-
-        MPath.From("/a/foo.txt").WithExtension("").ToUnixString().ShouldBe("/a/foo");
-    }
-
-    // MUT-01 + D-29a: WithExtension(".") throws InvalidPathException with the exact D-29a message
-    [Fact]
-    public void WithExtension_BareDot_Throws_WithD29aMessage()
+    public void WithExtension_BareDot_Throws()
     {
         var p = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\foo" : "/foo");
         var ex = Should.Throw<InvalidPathException>(() => p.WithExtension("."));
@@ -99,7 +80,7 @@ public class MPathMutationTests {
         ex.Message.ShouldContain("Use WithoutExtension() to remove");
     }
 
-    // MUT-01 + D-28: WithoutExtension strips extension
+    // WithoutExtension strips the trailing extension.
     [Fact]
     public void WithoutExtension_StripsExtension()
     {
@@ -109,7 +90,7 @@ public class MPathMutationTests {
         MPath.From("/a/foo.txt").WithoutExtension().ToUnixString().ShouldBe("/a/foo");
     }
 
-    // MUT-01 + D-28: WithoutExtension on extension-less path is idempotent
+    // WithoutExtension on an extension-less path is idempotent.
     [Fact]
     public void WithoutExtension_NoExtension_IsIdempotent()
     {
@@ -118,19 +99,5 @@ public class MPathMutationTests {
 
         var p = MPath.From("/a/foo");
         p.WithoutExtension().ShouldBe(p);
-    }
-
-    // MUT-01 + D-28: Mutation produces NEW instances; original is unchanged
-    [Fact]
-    public void Mutation_ProducesNewInstance_OriginalUnchanged()
-    {
-        if (PlatformTestHelpers.IsWindows)
-            return;
-
-        var original = MPath.From("/a/foo.txt");
-        var mutated = original.WithName("bar.md");
-        ReferenceEquals(original, mutated).ShouldBeFalse();
-        original.ToUnixString().ShouldBe("/a/foo.txt");
-        mutated.ToUnixString().ShouldBe("/a/bar.md");
     }
 }

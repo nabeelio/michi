@@ -1,16 +1,16 @@
+using Michi.Exceptions;
 using Michi.Tests.Internal;
 using Shouldly;
 using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: NORM-01 — six-rule normalization pipeline
 public class MPathNormalizationTests {
-    // NORM-01 rule 1: resolve `..` segments
+    // Resolve `..` segments (past-root stops at root).
     [Theory]
     [InlineData("/foo/../bar", "/bar")]
     [InlineData("/foo/bar/../baz", "/foo/baz")]
-    [InlineData("/foo/../../bar", "/bar")] // `..` past root stops at root
+    [InlineData("/foo/../../bar", "/bar")]
     public void Normalization_ResolvesDoubleDot_OnUnix(string input, string expected)
     {
         if (PlatformTestHelpers.IsWindows)
@@ -19,7 +19,7 @@ public class MPathNormalizationTests {
         MPath.From(input).ToUnixString().ShouldBe(expected);
     }
 
-    // NORM-01 rule 1: resolve `.` segments
+    // Resolve `.` segments.
     [Theory]
     [InlineData("/foo/./bar", "/foo/bar")]
     [InlineData("/foo/./bar/./baz", "/foo/bar/baz")]
@@ -31,7 +31,7 @@ public class MPathNormalizationTests {
         MPath.From(input).ToUnixString().ShouldBe(expected);
     }
 
-    // NORM-01 rule 2: collapse repeated separators
+    // Collapse repeated separators.
     [Theory]
     [InlineData("/foo//bar", "/foo/bar")]
     [InlineData("/foo///bar////baz", "/foo/bar/baz")]
@@ -43,7 +43,7 @@ public class MPathNormalizationTests {
         MPath.From(input).ToUnixString().ShouldBe(expected);
     }
 
-    // NORM-01 rule 3: backslash input is normalized to forward slash internally
+    // Backslash input is normalized to forward slash internally.
     [Theory]
     [InlineData("/foo\\bar", "/foo/bar")]
     [InlineData("/a\\b\\c", "/a/b/c")]
@@ -55,7 +55,7 @@ public class MPathNormalizationTests {
         MPath.From(input).ToUnixString().ShouldBe(expected);
     }
 
-    // NORM-01 rule 4: trailing slash is stripped (unless root)
+    // Trailing slash is stripped unless the result IS the root.
     [Theory]
     [InlineData("/foo/bar/", "/foo/bar")]
     [InlineData("/foo/", "/foo")]
@@ -67,7 +67,7 @@ public class MPathNormalizationTests {
         MPath.From(input).ToUnixString().ShouldBe(expected);
     }
 
-    // NORM-01 rule 4 (edge): root path preserves its trailing slash
+    // Root path preserves its trailing slash (it IS the root).
     [Fact]
     public void Normalization_RootPath_PreservesTrailingSlash_OnUnix()
     {
@@ -77,9 +77,9 @@ public class MPathNormalizationTests {
         MPath.From("/").ToUnixString().ShouldBe("/");
     }
 
-    // Full pipeline per phase success criterion 1
+    // Full pipeline: a multi-rule input canonicalizes in one pass.
     [Fact]
-    public void Normalization_FullPipeline_MatchesPhase1Criterion1()
+    public void Normalization_FullPipeline()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
@@ -88,21 +88,17 @@ public class MPathNormalizationTests {
         p.ToUnixString().ShouldBe("/bar/baz");
     }
 
-    // NORM-01 rule 5: tilde expansion OFF by default — tilde remains literal (not expanded).
+    // Tilde expansion OFF by default -- the literal ~ survives into the canonical output.
     [Fact]
-    public void Normalization_TildeExpansion_OffByDefault_ExpandsNotPerformed()
+    public void Normalization_TildeExpansion_OffByDefault()
     {
-        // With default options, ~/foo is treated as a relative path containing a
-        // literal '~' — it is resolved against BaseDirectory. The important property
-        // is that the tilde is NOT REPLACED by the user-profile directory during
-        // normalization. We prove that by confirming the literal '~' survives into
-        // the canonical output. (Checking ShouldNotStartWith(UserProfile) is too
-        // strict because BaseDirectory is itself usually under the user profile.)
-        var p = MPath.From("~/foo"); // default options, ExpandTilde = false
+        // With default options, ~/foo is a relative path containing a literal '~' -- resolved
+        // against BaseDirectory without replacement.
+        var p = MPath.From("~/foo");
         p.ToUnixString().ShouldContain("~");
     }
 
-    // NORM-01 rule 5: tilde expansion ON via options — tilde IS expanded
+    // Tilde expansion ON via options -- ~ IS replaced with the user-profile path.
     [Fact]
     public void Normalization_TildeExpansion_OnViaOptions_ReplacesWithUserProfile()
     {
@@ -115,7 +111,7 @@ public class MPathNormalizationTests {
         p.ToUnixString().ShouldBe(home + "/foo");
     }
 
-    // NORM-01 rule 6: env var expansion OFF by default — literal "$VAR" preserved
+    // Env-var expansion OFF by default -- literal "$VAR" preserved.
     [Fact]
     public void Normalization_EnvVarExpansion_OffByDefault_LiteralPreserved()
     {
@@ -126,18 +122,17 @@ public class MPathNormalizationTests {
         p.ToUnixString().ShouldContain("$NONEXISTENT_VAR_XYZ");
     }
 
-    // PITFALLS C-04: normalization does NOT touch the filesystem
+    // Normalization does NOT touch the filesystem -- construction is a pure string transform.
     [Fact]
     public void Normalization_DoesNotAccessFilesystem()
     {
-        // Construct an MPath for a non-existent path — must not throw, must not hang on slow FS.
         if (PlatformTestHelpers.IsWindows)
             return;
 
         Should.NotThrow(() => MPath.From("/this/path/definitely/does/not/exist/anywhere"));
     }
 
-    // PITFALLS C-10: invalid path characters on Windows throw InvalidPathException
+    // Invalid path characters on Windows throw InvalidPathException.
     [Fact]
     public void Normalization_InvalidPathCharacter_OnWindows_Throws()
     {
@@ -148,7 +143,7 @@ public class MPathNormalizationTests {
         ex.Message.ShouldContain("invalid path character");
     }
 
-    // PITFALLS C-10: on Unix, only NUL is invalid; other chars that are invalid on Windows are fine
+    // On Unix only NUL is invalid -- angle brackets and similar Windows-invalid chars pass.
     [Fact]
     public void Normalization_AngleBracketsAllowed_OnUnix()
     {
@@ -158,7 +153,7 @@ public class MPathNormalizationTests {
         Should.NotThrow(() => MPath.From("/foo/b<ar"));
     }
 
-    // D-45: relative path resolves against BaseDirectory (full pipeline smoke)
+    // Relative path resolves against BaseDirectory.
     [Fact]
     public void Normalization_RelativePath_ResolvesAgainstBaseDirectory()
     {
