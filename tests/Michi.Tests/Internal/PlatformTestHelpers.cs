@@ -22,11 +22,11 @@ namespace Michi.Tests.Internal;
 /// xUnit v3's native <see cref="Assert.Skip(string)" />).
 /// </summary>
 /// <remarks>
-/// xUnit v3 shipped <see cref="Assert.Skip(string)" /> as a first-class API, so no
+/// xUnit v3 ships <see cref="Assert.Skip(string)" /> as a first-class API -- no
 /// <c>
 /// SkippableFact
 /// </c>
-/// package is needed. See CONTEXT.md §D-42.
+/// package is needed.
 /// </remarks>
 internal static class PlatformTestHelpers {
     public static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);

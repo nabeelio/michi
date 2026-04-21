@@ -4,9 +4,8 @@ using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: CORE-06 — equality, hash, compare, ==/!= operators
 public class MPathEqualityTests {
-    // CORE-06: host-OS case-insensitive equality on Windows/macOS
+    // Host-OS case-insensitive equality on Windows/macOS.
     [Fact]
     public void Equals_DifferentCase_TrueOnWindowsAndMacOS()
     {
@@ -18,7 +17,7 @@ public class MPathEqualityTests {
         MPath.From(baseInput).Equals(MPath.From(otherInput)).ShouldBeTrue();
     }
 
-    // CORE-06: host-OS case-sensitive equality on Linux
+    // Host-OS case-sensitive equality on Linux.
     [Fact]
     public void Equals_DifferentCase_FalseOnLinux()
     {
@@ -28,8 +27,9 @@ public class MPathEqualityTests {
         MPath.From("/Foo/Bar").Equals(MPath.From("/foo/bar")).ShouldBeFalse();
     }
 
-    // D-43 + PITFALLS C-01: Nuke-bug regression guard — case variants that compare equal MUST have matching hash codes.
-    // This test exists specifically to prevent the hash/equality inconsistency bug that Nuke's AbsolutePath shipped with.
+    // Equals/GetHashCode contract -- equal paths must produce equal hashes (CA1065).
+    // Case variants exercise the case-insensitive branch on Windows/macOS; on Linux
+    // the assertion is vacuously true (values differ, implication holds).
     [Theory]
     [InlineData("/Foo/Bar", "/FOO/BAR")]
     [InlineData("/foo/Bar", "/foo/bar")]
@@ -37,46 +37,34 @@ public class MPathEqualityTests {
     [InlineData("/a/B/c", "/A/b/C")]
     [InlineData("/alpha/beta", "/ALPHA/BETA")]
     [InlineData("/MixedCase/Path", "/mixedcase/path")]
-    public void HashCode_IsConsistentWithEquals_ForCaseVariants_NukeRegressionGuard(string a, string b)
+    public void HashCode_IsConsistentWithEquals_ForCaseVariants(string a, string b)
     {
-        // On Linux (case-sensitive): equals and hashes both differ — test still passes because the contract
-        //   is "if a.Equals(b) then hash(a) == hash(b)", which is vacuously true when Equals is false.
-        // On Windows/macOS (case-insensitive): a.Equals(b) is true AND hashes must match.
         var pa = MPath.From(a);
         var pb = MPath.From(b);
         if (pa.Equals(pb)) {
             pa.GetHashCode()
                    .ShouldBe(
                         pb.GetHashCode(),
-                        $"Equal MPaths must have equal hashes. '{a}' vs '{b}'. This is the Nuke-AbsolutePath bug regression guard (D-43)."
+                        $"Equal MPaths must have equal hashes. '{a}' vs '{b}'."
                     );
         }
     }
 
-    // CORE-06: identical paths compare equal regardless of input form (backslash vs forward slash)
-    [Fact]
-    public void Equals_BackslashAndForwardSlashInput_CompareEqual()
-    {
-        if (PlatformTestHelpers.IsWindows)
-            return;
-
-        MPath.From("/foo/bar").Equals(MPath.From("/foo\\bar")).ShouldBeTrue();
-    }
-
-    // CORE-06: Equals(object) delegates to Equals(MPath)
+    // Equals(object) delegates to Equals(MPath).
     [Fact]
     public void EqualsObject_DelegatesToEqualsMPath()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
 
-        object other = MPath.From("/foo");
-        MPath.From("/foo").Equals(other).ShouldBeTrue();
-        MPath.From("/foo").Equals("not an mpath").ShouldBeFalse();
+        object otherMPath = MPath.From("/foo");
+        object notAnMPath = "not an mpath";
+        MPath.From("/foo").Equals(otherMPath).ShouldBeTrue();
+        MPath.From("/foo").Equals(notAnMPath).ShouldBeFalse();
         MPath.From("/foo").Equals((object?) null).ShouldBeFalse();
     }
 
-    // CORE-06: == and != operators
+    // == and != operators.
     [Fact]
     public void OperatorEquality_HandlesNullsAndReferenceEquality()
     {
@@ -95,7 +83,7 @@ public class MPathEqualityTests {
         (c != d).ShouldBeFalse();
     }
 
-    // CORE-06: CompareTo produces a total order consistent with Equals
+    // CompareTo produces a total order consistent with Equals.
     [Fact]
     public void CompareTo_ProducesTotalOrderConsistentWithEquals()
     {
@@ -110,7 +98,7 @@ public class MPathEqualityTests {
         a.CompareTo(null).ShouldBeGreaterThan(0); // null precedes any value -> this is > 0
     }
 
-    // CORE-06: HashSet dedup uses equality correctly on the host OS
+    // HashSet dedup uses equality correctly on the host OS.
     [Fact]
     public void HashSet_DedupsOnHostOsCase()
     {

@@ -4,9 +4,8 @@ using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: CORE-03 — derived properties (Name/Extension/NameWithoutExtension/HasExtension/Segments/Depth/Root)
 public class MPathPropertiesTests {
-    // CORE-03: Name returns the final segment
+    // Name returns the final segment.
     [Fact]
     public void Name_ReturnsFinalSegment()
     {
@@ -17,7 +16,7 @@ public class MPathPropertiesTests {
         MPath.From("/foo").Name.ShouldBe("foo");
     }
 
-    // CORE-03: Extension includes the leading dot
+    // Extension includes the leading dot.
     [Fact]
     public void Extension_IncludesLeadingDot()
     {
@@ -28,7 +27,7 @@ public class MPathPropertiesTests {
         MPath.From("/a/b").Extension.ShouldBe("");
     }
 
-    // CORE-03: NameWithoutExtension strips the trailing extension
+    // NameWithoutExtension strips the trailing extension.
     [Fact]
     public void NameWithoutExtension_StripsTrailingExtension()
     {
@@ -39,7 +38,7 @@ public class MPathPropertiesTests {
         MPath.From("/a/foo").NameWithoutExtension.ShouldBe("foo");
     }
 
-    // CORE-03: hidden-file dot-prefix is NOT treated as an extension separator
+    // Hidden-file leading dot is NOT treated as an extension separator.
     [Fact]
     public void HiddenFile_LeadingDot_NotTreatedAsExtension()
     {
@@ -53,7 +52,7 @@ public class MPathPropertiesTests {
         p.HasExtension.ShouldBeFalse();
     }
 
-    // CORE-03: Segments returns the path below the root
+    // Segments returns the path below the root.
     [Fact]
     public void Segments_ReturnsSegmentsBelowRoot()
     {
@@ -64,27 +63,26 @@ public class MPathPropertiesTests {
         string[] expected = [
             "a",
             "b",
-            "c",,
+            "c",
         ];
 
         segs.ShouldBe(expected);
     }
 
-    // PITFALLS M-17: Segments returns a defensive copy (mutating the returned array doesn't affect the instance)
+    // Segments is a read-only view -- the returned collection cannot mutate internal state.
     [Fact]
-    public void Segments_ReturnsDefensiveCopy()
+    public void Segments_IsReadOnly()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
 
         var p = MPath.From("/a/b/c");
-        var first = p.Segments;
-        first[0] = "MUTATED";
-        var second = p.Segments;
-        second[0].ShouldBe("a"); // internal state unaffected
+        p.Segments.ShouldBeAssignableTo<IReadOnlyList<string>>();
+        p.Segments[0].ShouldBe("a");
+        p.Segments.Count.ShouldBe(3);
     }
 
-    // CORE-03: Depth matches segment count
+    // Depth matches segment count.
     [Fact]
     public void Depth_MatchesSegmentCount()
     {
@@ -96,7 +94,7 @@ public class MPathPropertiesTests {
         MPath.From("/a/b/c").Depth.ShouldBe(3);
     }
 
-    // CORE-03: HasExtension matches Extension.Length > 0
+    // HasExtension matches Extension.Length > 0.
     [Theory]
     [InlineData("/foo/bar.txt", true)]
     [InlineData("/foo/bar", false)]
@@ -109,7 +107,7 @@ public class MPathPropertiesTests {
         MPath.From(path).HasExtension.ShouldBe(expected);
     }
 
-    // CORE-03: Root is "/" on Unix absolute paths
+    // Root is "/" on Unix absolute paths.
     [Fact]
     public void Root_IsForwardSlash_OnUnix()
     {
@@ -119,7 +117,7 @@ public class MPathPropertiesTests {
         MPath.From("/a/b/c").Root.ShouldBe("/");
     }
 
-    // CORE-03: Root includes drive letter + trailing slash on Windows
+    // Root includes drive letter + trailing slash on Windows.
     [Fact]
     public void Root_IncludesDriveLetter_OnWindows()
     {

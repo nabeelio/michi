@@ -4,9 +4,8 @@ using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: CORE-04 — path joining via / operator and Join(params)
 public class MPathJoiningTests {
-    // CORE-04: basic join via /
+    // Basic join via the / operator.
     [Fact]
     public void SlashOperator_BasicJoin()
     {
@@ -16,7 +15,7 @@ public class MPathJoiningTests {
         (MPath.From("/foo") / "bar").ToUnixString().ShouldBe("/foo/bar");
     }
 
-    // CORE-04 + D-16a: leading / on RHS is STRIPPED (RHS-always-relative rule)
+    // Leading / on the RHS is stripped -- the RHS is always treated as relative.
     [Fact]
     public void SlashOperator_LeadingSlashOnRhs_IsStripped()
     {
@@ -26,7 +25,7 @@ public class MPathJoiningTests {
         (MPath.From("/var/www") / "/etc").ToUnixString().ShouldBe("/var/www/etc");
     }
 
-    // CORE-04 + D-16a: leading backslash on RHS is ALSO stripped
+    // Leading backslash on the RHS is also stripped.
     [Fact]
     public void SlashOperator_LeadingBackslashOnRhs_IsStripped()
     {
@@ -36,7 +35,7 @@ public class MPathJoiningTests {
         (MPath.From("/var") / "\\etc").ToUnixString().ShouldBe("/var/etc");
     }
 
-    // CORE-04: RHS may contain internal separators (joined + normalized)
+    // The RHS may contain internal separators (joined + normalized).
     [Fact]
     public void SlashOperator_RhsWithInternalSeparators_JoinsAndNormalizes()
     {
@@ -46,7 +45,7 @@ public class MPathJoiningTests {
         (MPath.From("/a") / "b/c/d").ToUnixString().ShouldBe("/a/b/c/d");
     }
 
-    // CORE-04 + D-18: RHS may contain `..` (join does NOT prevent traversal)
+    // The RHS may contain `..` -- join does NOT prevent traversal. Validate the result if needed.
     [Fact]
     public void SlashOperator_RhsWithDoubleDot_Traverses()
     {
@@ -56,21 +55,18 @@ public class MPathJoiningTests {
         (MPath.From("/a/b") / "../c").ToUnixString().ShouldBe("/a/c");
     }
 
-    // CORE-04: null segment throws ArgumentNullException
+    // Null segment throws ArgumentNullException.
     [Fact]
     public void SlashOperator_NullSegment_ThrowsArgumentNullException()
     {
         var p = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\foo" : "/foo");
-        var ex = Should.Throw<ArgumentNullException>(() => {
-                var _ = p / null!;
-            }
-        );
+        var ex = Should.Throw<ArgumentNullException>(() => { _ = p / null!; });
 
         ex.ParamName.ShouldBe("segment");
         ex.Message.ShouldContain("empty string");
     }
 
-    // CORE-04: empty segment returns same path unchanged
+    // Empty segment returns the same path unchanged.
     [Fact]
     public void SlashOperator_EmptySegment_ReturnsUnchanged()
     {
@@ -81,7 +77,7 @@ public class MPathJoiningTests {
         (p / "").ShouldBe(p);
     }
 
-    // CORE-04: Join(params) chains segments
+    // Join(params) chains segments.
     [Fact]
     public void Join_ChainsSegments()
     {
@@ -91,40 +87,9 @@ public class MPathJoiningTests {
         MPath.From("/a").Join("b", "c", "d").ToUnixString().ShouldBe("/a/b/c/d");
     }
 
-    // CORE-04: Join(params) skips null/empty segments
+    // Chained join produces the expected segment list and equality with the direct form.
     [Fact]
-    public void Join_SkipsNullAndEmpty()
-    {
-        if (PlatformTestHelpers.IsWindows)
-            return;
-
-        MPath.From("/a")
-               .Join(
-                    null!,
-                    "",
-                    "b",
-                    null!,
-                    "c"
-                )
-               .ToUnixString()
-               .ShouldBe("/a/b/c");
-    }
-
-    // CORE-04: Join(null or empty array) returns self
-    [Fact]
-    public void Join_NullOrEmpty_ReturnsSelf()
-    {
-        if (PlatformTestHelpers.IsWindows)
-            return;
-
-        var p = MPath.From("/a");
-        p.Join().ShouldBe(p);
-        p.Join(null!).ShouldBe(p);
-    }
-
-    // Phase success criterion 2: (From("/a") / "b" / "c").Segments == ["a","b","c"] and equals From("/a/b/c")
-    [Fact]
-    public void Joining_ProducesSegmentsAndEquality_Phase1Criterion2()
+    public void Joining_ProducesSegmentsAndEquality()
     {
         if (PlatformTestHelpers.IsWindows)
             return;

@@ -9,7 +9,7 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
 
-  <!-- Deterministic builds. SourceLink, XML docs, and symbol packages ship in Phase 5. -->
+  <!-- Deterministic builds. SourceLink, XML docs, and symbol packages get wired in later. -->
   <PropertyGroup>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
@@ -17,18 +17,33 @@
 
   <!-- Static NuGet identity metadata. Release-engineering properties (SourceLink,
        GenerateDocumentationFile, IncludeSymbols, SymbolPackageFormat,
-       EmbedUntrackedSources, PublishRepositoryUrl) are Phase 5 per CONTEXT D-40. -->
+       EmbedUntrackedSources, PublishRepositoryUrl) are not set here yet. -->
   <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('src'))">
     <Authors>Nabeel Shahzad</Authors>
     <Company>nabeelio</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/nabeelio/upath</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nabeelio/upath</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/nabeelio/michi</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nabeelio/michi</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>path;filesystem;mpath;absolute-path</PackageTags>
     <Copyright>Copyright (c) Nabeel Shahzad</Copyright>
     <Description>Strongly-typed absolute path type for .NET. Immutable, normalized, cross-platform.</Description>
   </PropertyGroup>
+
+  <!-- Versioning via MinVer: tags drive the version. `v1.2.3` produces 1.2.3.
+       Between releases, builds get an alpha tag with commit height: 1.2.4-alpha.0.5+sha.
+       Shared versioning across all packages in this repo via the inherited tag prefix.
+       Override MinVerTagPrefix in a satellite project's csproj if it ever needs to ship
+       independently. CI must use fetch-depth: 0 so MinVer can see tag history. -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('src'))">
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerDefaultPreReleaseIdentifiers>alpha.0</MinVerDefaultPreReleaseIdentifiers>
+    <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$(MSBuildProjectDirectory.Contains('src'))">
+    <PackageReference Include="MinVer" PrivateAssets="all" />
+  </ItemGroup>
 
 </Project>

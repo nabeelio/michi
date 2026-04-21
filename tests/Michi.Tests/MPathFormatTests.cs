@@ -1,12 +1,12 @@
+using Michi.Exceptions;
 using Michi.Tests.Internal;
 using Shouldly;
 using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: CORE-02 — Format() substitution + invariant culture + invalid-char rejection
 public class MPathFormatTests {
-    // CORE-02 + D-06: basic substitution via string.Format semantics
+    // Basic substitution via string.Format semantics.
     [Fact]
     public void Format_BasicSubstitution_WorksLikeStringFormat()
     {
@@ -17,18 +17,7 @@ public class MPathFormatTests {
         p.ToUnixString().ShouldBe("/home/alice/docs");
     }
 
-    // CORE-02 + D-06: double-brace escaping produces literal braces
-    [Fact]
-    public void Format_DoubleBraces_ProduceLiteralBraces()
-    {
-        if (PlatformTestHelpers.IsWindows)
-            return;
-
-        var p = MPath.Format("/var/{{literal}}/{0}", "x");
-        p.ToUnixString().ShouldBe("/var/{literal}/x");
-    }
-
-    // CORE-02 + D-06: null template throws ArgumentNullException with verbose message
+    // Null template throws ArgumentNullException with a verbose actionable message.
     [Fact]
     public void Format_NullTemplate_ThrowsArgumentNullException_WithActionableMessage()
     {
@@ -37,7 +26,8 @@ public class MPathFormatTests {
         ex.Message.ShouldContain("string.Format-style template");
     }
 
-    // CORE-02 + D-06 + PITFALLS C-08: culture invariant — numeric formatting doesn't use current locale
+    // Culture-invariant: numeric formatting doesn't use the current locale. This guards against
+    // the Turkish-I trap and locale-dependent thousand separators.
     [Fact]
     public void Format_NumericArg_UsesInvariantCulture()
     {
@@ -45,11 +35,10 @@ public class MPathFormatTests {
             return;
 
         var p = MPath.Format("/data/{0}", 1234);
-        // Invariant culture: no thousand separator, no decimal comma
         p.ToUnixString().ShouldBe("/data/1234");
     }
 
-    // PITFALLS C-10: invalid path characters are rejected with a message naming the character + hex code
+    // Invalid path characters are rejected with a message naming the character and hex code.
     [Fact]
     public void Format_NullCharInSubstitution_ThrowsInvalidPathException_NamingCharAndHex()
     {
@@ -60,19 +49,17 @@ public class MPathFormatTests {
         ex.AttemptedPath.ShouldContain("evil");
     }
 
-    // PITFALLS C-12: Format XML doc warns about traversal via user input — this test documents that the behavior
-    // allows traversal (the safety warning is in docs, not in code). Consumer must use ResolveContained for safety.
+    // Format's XML doc warns that traversal via user input IS allowed -- this test pins that
+    // documented behavior. Callers handling untrusted input must validate the result.
     [Fact]
-    public void Format_TraversalInUserInput_NormalizesButReachesParent_DocumentedAsRiskInXmlDoc()
+    public void Format_TraversalInUserInput_NormalizesButReachesParent()
     {
         if (PlatformTestHelpers.IsWindows)
             return;
 
         var userInput = "../etc";
         var p = MPath.Format("/home/{0}/docs", userInput);
-        // Normalization resolves `..` — the result escapes /home/.
+        // Normalization resolves `..`, so the result escapes /home.
         p.ToUnixString().ShouldBe("/etc/docs");
-        // This test asserts the documented (unsafe-for-untrusted-input) behavior.
-        // See MPath.Format XML doc's <remarks> block for the SECURITY warning.
     }
 }

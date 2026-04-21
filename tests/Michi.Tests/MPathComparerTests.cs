@@ -4,9 +4,8 @@ using Xunit;
 
 namespace Michi.Tests;
 
-// requirement: CORE-06 — MPathComparer.Ordinal / OrdinalIgnoreCase explicit comparers
 public class MPathComparerTests {
-    // CORE-06 + D-14: MPathComparer.Ordinal is case-sensitive regardless of host OS
+    // MPathComparer.Ordinal is case-sensitive regardless of host OS.
     [Fact]
     public void OrdinalComparer_IsCaseSensitive_OnWindowsAndMacOS()
     {
@@ -19,7 +18,7 @@ public class MPathComparerTests {
         MPathComparer.Ordinal.GetHashCode(a).ShouldNotBe(MPathComparer.Ordinal.GetHashCode(b));
     }
 
-    // CORE-06 + D-14: MPathComparer.OrdinalIgnoreCase is case-insensitive regardless of host OS
+    // MPathComparer.OrdinalIgnoreCase is case-insensitive regardless of host OS.
     [Fact]
     public void OrdinalIgnoreCaseComparer_IsCaseInsensitive_OnLinux()
     {
@@ -32,7 +31,7 @@ public class MPathComparerTests {
         MPathComparer.OrdinalIgnoreCase.GetHashCode(a).ShouldBe(MPathComparer.OrdinalIgnoreCase.GetHashCode(b));
     }
 
-    // CORE-06 + D-14: HashSet with explicit comparer overrides host-OS default
+    // HashSet with explicit comparer overrides the host-OS default.
     [Fact]
     public void HashSet_WithOrdinalComparer_DoesNotDedupCaseVariantsEvenOnWindows()
     {
@@ -46,10 +45,10 @@ public class MPathComparerTests {
             MPath.From(inputB),
         };
 
-        set.Count.ShouldBe(2); // both retained — ordinal is case-sensitive
+        set.Count.ShouldBe(2); // both retained -- ordinal is case-sensitive
     }
 
-    // CORE-06: comparer throws verbose ArgumentNullException on null GetHashCode arg
+    // Comparer throws a verbose ArgumentNullException on null GetHashCode arg.
     [Fact]
     public void OrdinalComparer_GetHashCode_NullArg_ThrowsWithVerboseMessage()
     {
