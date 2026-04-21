@@ -153,6 +153,46 @@ public class MPathNormalizationTests {
         Should.NotThrow(() => MPath.From("/foo/b<ar"));
     }
 
+    // macOS rejects ':' in segments because Finder/Carbon legacy translates ':' to '/' in
+    // user-visible names, so round-tripping through Finder / AppleScript / NSURL would lie.
+    // See PITFALLS C-10 research: POSIX at the kernel level allows ':', but the Mac ecosystem
+    // does not.
+    [Fact]
+    public void Normalization_ColonInSegment_OnMacOS_Throws()
+    {
+        if (!PlatformTestHelpers.IsMacOS)
+            return;
+
+        var ex = Should.Throw<InvalidPathException>(() => MPath.From("/foo/ba:r"));
+        ex.Message.ShouldContain("invalid path character");
+    }
+
+    // Linux: ':' is a perfectly legal filename character at the ext4/btrfs/xfs layer. POSIX
+    // §3.170 forbids only NUL and '/'. Accepting ':' on Linux matches the real filesystem.
+    [Fact]
+    public void Normalization_ColonInSegment_OnLinux_Allowed()
+    {
+        if (!PlatformTestHelpers.IsLinux)
+            return;
+
+        Should.NotThrow(() => MPath.From("/foo/ba:r"));
+    }
+
+    // Unicode (emoji, CJK ideographs, accented Latin) is legal on every platform. NTFS stores
+    // UTF-16 code units; APFS and ext4/btrfs are bag-of-bytes and store UTF-8 unchanged. Locks
+    // in that Michi does NOT over-reject non-ASCII segments. The test runs on all three OSes
+    // with platform-appropriate roots.
+    [Theory]
+    [InlineData("\ud83d\ude80rocket.txt")] // 🚀 (U+1F680, surrogate pair in UTF-16)
+    [InlineData("\u65e5\u672c\u8a9e.txt")] // 日本語
+    [InlineData("caf\u00e9.md")] // café (NFC)
+    [InlineData("cafe\u0301.md")] // café (NFD)
+    public void Normalization_UnicodeSegments_AllowedOnAllPlatforms(string segmentName)
+    {
+        var root = PlatformTestHelpers.IsWindows ? @"C:\foo\" : "/foo/";
+        Should.NotThrow(() => MPath.From(root + segmentName));
+    }
+
     // Relative path resolves against BaseDirectory.
     [Fact]
     public void Normalization_RelativePath_ResolvesAgainstBaseDirectory()
