@@ -187,11 +187,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </exception>
     public static MPath From(string path, MPathOptions? options = null)
     {
-        Guard.NotNull(
-            path,
-            nameof(path),
-            "Path cannot be null. Use TryFrom to accept null input without exceptions."
-        );
+        Guard.NotNull(path, "Path cannot be null. Use TryFrom to accept null input without exceptions.");
 
         var result = PathNormalizer.Normalize(path, options ?? MPathOptions.Default);
 
@@ -210,15 +206,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </exception>
     public static MPath From(string path, string relativeTo, MPathOptions? options = null)
     {
-        Guard.NotNull(
-            path,
-            nameof(path),
-            "Path cannot be null. Use TryFrom to accept null input without exceptions."
-        );
-
+        Guard.NotNull(path, "Path cannot be null. Use TryFrom to accept null input without exceptions.");
         Guard.NotNull(
             relativeTo,
-            nameof(relativeTo),
             "relativeTo cannot be null. Pass an absolute path string to resolve relative inputs against."
         );
 
@@ -275,7 +265,6 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     {
         Guard.NotNull(
             template,
-            nameof(template),
             "Format template cannot be null. Provide a string.Format-style template."
         );
 
@@ -419,10 +408,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         if (ReferenceEquals(this, other))
             return true;
 
-        if (other is null)
-            return false;
-
-        return HostOs.PathComparer.Equals(_path, other._path);
+        return other is not null && HostOs.PathComparer.Equals(_path, other._path);
     }
 
     /// <inheritdoc />
@@ -441,10 +427,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         if (ReferenceEquals(this, other))
             return 0;
 
-        if (other is null)
-            return 1;
-
-        return string.Compare(_path, other._path, HostOs.PathComparison);
+        return other is null ? 1 : string.Compare(_path, other._path, HostOs.PathComparison);
     }
 
     public static bool operator ==(MPath? left, MPath? right)
@@ -553,10 +536,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </exception>
     public static MPath operator /(MPath left, string segment)
     {
-        Guard.NotNull(left, nameof(left), "Left-hand operand of the / operator cannot be null.");
+        Guard.NotNull(left, "Left-hand operand of the / operator cannot be null.");
         Guard.NotNull(
             segment,
-            nameof(segment),
             "Right-hand segment cannot be null. Pass an empty string to keep the base path unchanged."
         );
 
@@ -662,7 +644,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </exception>
     public MPath WithName(string name)
     {
-        Guard.NotNull(name, nameof(name), "Name cannot be null. Pass a non-empty segment string.");
+        Guard.NotNull(name, "Name cannot be null. Pass a non-empty segment string.");
 
         if (name.Length == 0) {
             throw new InvalidPathException(name, "Name is empty. Pass a non-empty segment string");

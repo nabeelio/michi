@@ -15,13 +15,13 @@ namespace Michi.Internal;
 /// </para>
 /// </remarks>
 internal static class HostOs {
-    /// <summary><c>true</c> on Windows (NTFS, case-insensitive).</summary>
+    /// <summary>`true` on Windows (NTFS, case-insensitive).</summary>
     public static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
-    /// <summary><c>true</c> on macOS (APFS default, case-insensitive).</summary>
+    /// <summary>`true` on macOS (APFS default, case-insensitive).</summary>
     public static readonly bool IsMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
-    /// <summary><c>true</c> on Linux (ext4/btrfs, case-sensitive).</summary>
+    /// <summary>`true` on Linux (ext4/btrfs, case-sensitive).</summary>
     public static readonly bool IsLinux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
 
     /// <summary>
@@ -36,7 +36,7 @@ internal static class HostOs {
 
     /// <summary>
     /// <see cref="StringComparer" /> aligned with <see cref="PathComparison" />. Used for allocation-free
-    /// <c>GetHashCode(string)</c>.
+    /// `GetHashCode(string)`.
     /// </summary>
     public static readonly StringComparer PathComparer = StringComparer.FromComparison(PathComparison);
 }

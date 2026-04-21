@@ -5,28 +5,14 @@ namespace Michi.Tests.Internal;
 
 /// <summary>
 /// Platform-detection helpers for tests that are only meaningful on a specific OS
-/// or filesystem case-sensitivity mode. Tests typically use the
-/// <c>
-/// IsX
-/// </c>
-/// boolean
-/// properties with an early
-/// <c>
-/// return
-/// </c>
-/// (which registers as a silent pass) or the
-/// <c>
-/// SkipUnlessX
-/// </c>
-/// helpers (which register as a skip in the MTP report via
-/// xUnit v3's native <see cref="Assert.Skip(string)" />).
+/// or filesystem case-sensitivity mode. Tests typically use the `IsX` boolean properties
+/// with an early `return` (which registers as a silent pass) or the `SkipUnlessX` helpers
+/// (which register as a skip in the MTP report via xUnit v3's native
+/// <see cref="Assert.Skip(string)" />).
 /// </summary>
 /// <remarks>
 /// xUnit v3 ships <see cref="Assert.Skip(string)" /> as a first-class API -- no
-/// <c>
-/// SkippableFact
-/// </c>
-/// package is needed.
+/// `SkippableFact` package is needed.
 /// </remarks>
 internal static class PlatformTestHelpers {
     public static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);

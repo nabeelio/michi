@@ -47,11 +47,7 @@ public static class MPathComparer {
 
         public int GetHashCode(MPath obj)
         {
-            Guard.NotNull(
-                obj,
-                nameof(obj),
-                "Cannot hash a null MPath via MPathComparer. Pass a non-null instance."
-            );
+            Guard.NotNull(obj, "Cannot hash a null MPath via MPathComparer. Pass a non-null instance.");
 
             return _comparer.GetHashCode(obj.ToUnixString());
         }

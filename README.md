@@ -229,7 +229,7 @@ A bunch of well-known paths/commonly used are included
 ```csharp
 MPath.Home;              // user profile -- cached singleton
 MPath.Temp;              // system temp -- cached singleton
-MPath.
+MPath.InstallDirectory   // where the exe is installed to
 MPath.CurrentDirectory;  // evaluated on every access, NOT cached
 ```
 
