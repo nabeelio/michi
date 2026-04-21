@@ -90,8 +90,8 @@ internal static class PathNormalizer {
 
         // Cross-platform invalid-char guard. Linux's GetInvalidPathChars only returns '\0' so this is
         // mostly a Windows safety net, but running it uniformly keeps error surfaces consistent.
-        var invalidChars = Path.GetInvalidPathChars();
-        var badIndex = normalized.IndexOfAny(invalidChars);
+        var invalidPathChars = Path.GetInvalidPathChars();
+        var badIndex = normalized.IndexOfAny(invalidPathChars);
         if (badIndex >= 0) {
             var ch = normalized[badIndex];
 
@@ -99,6 +99,30 @@ internal static class PathNormalizer {
                 attempted,
                 $"Contains invalid path character '{ch}' (0x{(int) ch:X4}). See Path.GetInvalidPathChars() for the current platform"
             );
+        }
+
+        // Segment-level invalid-char guard on Windows. GetInvalidPathChars() on Windows returns only
+        // control chars 0x00-0x1F; the reserved-in-filenames set (< > | " * ?) is in
+        // GetInvalidFileNameChars(). We check per segment (skipping the root) so that ':' at the
+        // drive-letter root is still allowed while ':' embedded in a filename is rejected. See
+        // PITFALLS C-10.
+        if (HostOs.IsWindows) {
+            var invalidFileNameChars = Path.GetInvalidFileNameChars();
+            var tail = normalized.Length > root.Length ? normalized[root.Length..] : string.Empty;
+            var segments = tail.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var segment in segments) {
+                var segBadIndex = segment.IndexOfAny(invalidFileNameChars);
+                if (segBadIndex < 0) {
+                    continue;
+                }
+
+                var ch = segment[segBadIndex];
+
+                throw new InvalidPathException(
+                    attempted,
+                    $"Contains invalid path character '{ch}' (0x{(int) ch:X4}). See Path.GetInvalidFileNameChars() for the current platform"
+                );
+            }
         }
 
         return new(normalized, root);
