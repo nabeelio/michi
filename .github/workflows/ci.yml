@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0              # MinVer requires full tag history
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           cache: true
           cache-dependency-path: |
