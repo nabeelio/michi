@@ -2,26 +2,18 @@ using Michi.Exceptions;
 
 namespace Michi.Internal;
 
-/// <summary>Canonical path + extracted root, returned by <see cref="PathNormalizer.Normalize" />.</summary>
-internal readonly struct NormalizationResult {
-    /// <summary>
-    /// Normalized absolute path in forward-slash form. No trailing slash unless the path is the root
-    /// itself ("/" on Unix, "C:/" on Windows).
-    /// </summary>
-    public string Normalized { get; }
-
-    /// <summary>
-    /// Root prefix in forward-slash form. "/" for Unix absolutes, "C:/" for Windows drive letters,
-    /// "//server/share" for UNC.
-    /// </summary>
-    public string Root { get; }
-
-    public NormalizationResult(string normalized, string root)
-    {
-        Normalized = normalized;
-        Root = root;
-    }
-}
+/// <summary>
+/// Canonical path + extracted root, returned by <see cref="PathNormalizer.Normalize" />.
+/// </summary>
+/// <param name="Normalized">
+/// Normalized absolute path in forward-slash form. No trailing slash unless the path is the root
+/// itself ("/" on Unix, "C:/" on Windows).
+/// </param>
+/// <param name="Root">
+/// Root prefix in forward-slash form. "/" for Unix absolutes, "C:/" for Windows drive letters,
+/// "//server/share" for UNC.
+/// </param>
+internal readonly record struct NormalizationResult(string Normalized, string Root);
 
 /// <summary>
 /// Canonicalizes paths: resolves <c>..</c>/<c>.</c> segments, collapses repeated separators, resolves
@@ -80,9 +72,7 @@ internal static class PathNormalizer {
         string resolved;
         try {
             resolved = Path.GetFullPath(path, basePath);
-        } catch (Exception ex) when (ex is ArgumentException
-                                  || ex is NotSupportedException
-                                  || ex is PathTooLongException) {
+        } catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) {
             throw new InvalidPathException(attempted, $"Cannot resolve path: {ex.Message}", ex);
         }
 

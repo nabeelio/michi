@@ -5,7 +5,12 @@
 Stop passing raw strings around for filesystem paths. `MPath` is a strongly-typed, immutable, 
 absolute path that normalizes at construction and works on Windows, macOS, and Linux.
 
-Michi means path 
+Michi (ミチ) means path in Japanese. The core type is `MPath`:
+
+- **M**odern Path
+- **M**anaged Path
+- **M**ichi Path
+- 
 ## Install
 
 ```
@@ -14,13 +19,13 @@ dotnet add package Michi
 
 Targets `netstandard2.1`, `net8.0`, `net10.0`.
 
-## The basics
+## The Basics
 
 ```csharp
 using Michi;
 
 var logs = MPath.From("/var/log/myapp");
-var file = logs / "2026-04-20.log";          // /var/log/myapp/2026-04-20.log
+var file = logs / "2026-04-20.log";           // /var/log/myapp/2026-04-20.log
 var parent = file.Parent;                     // /var/log/myapp
 var renamed = file.WithName("today.log");     // /var/log/myapp/today.log
 var md = file.WithExtension("md");            // /var/log/myapp/2026-04-20.md
@@ -38,9 +43,12 @@ MPath.TryFrom("maybe-a-path?", out var p);    // non-throwing
 MPath.Format("/home/{0}/docs", "alice");      // template + args
 ```
 
-Relative paths without a base resolve against `AppContext.BaseDirectory`. That's deliberate. `Directory.GetCurrentDirectory()` varies by launch context and is a mutable process property, so Michi stays away from it by default.
+Relative paths without a base resolve against `AppContext.BaseDirectory`. That's deliberate. 
+`Directory.GetCurrentDirectory()` varies by launch context and is a mutable process property, 
+so Michi stays away from it by default.
 
-Null input to `From` throws `ArgumentNullException`. Empty string throws `InvalidPathException`. `TryFrom` swallows both and returns `false`.
+Null input to `From` throws `ArgumentNullException`. Empty string throws `InvalidPathException`. 
+`TryFrom` swallows both and returns `false`.
 
 ## Normalization
 
@@ -51,7 +59,8 @@ MPath.From("/foo/../bar//baz/").ToString();   // "/bar/baz"
 MPath.From("/foo\\bar").ToUnixString();       // "/foo/bar"  (backslash -> forward)
 ```
 
-`..` resolves up, `.` drops out, repeated separators collapse, trailing slashes get stripped, and everything ends up in forward-slash canonical form internally. Backslash input works on any OS.
+`..` resolves up, `.` drops out, repeated separators collapse, trailing slashes get stripped, 
+and everything ends up in forward-slash canonical form internally. Backslash input works on any OS.
 
 ## Equality that actually works
 
@@ -63,7 +72,8 @@ a.Equals(b);                                   // true on Windows/macOS, false o
 a.GetHashCode() == b.GetHashCode();            // same -- consistent with Equals
 ```
 
-Hash and equality derive from one source (`HostOs.PathComparer`), so they can't drift apart. If two paths are equal, their hashes match. Always.
+Hash and equality derive from one source (`HostOs.PathComparer`), so they can't drift apart. 
+If two paths are equal, their hashes match. Always.
 
 Need explicit behavior regardless of host?
 
@@ -83,7 +93,9 @@ p.ToUnixString();     // "C:/Users/alice"   -- always forward slash
 p.ToWindowsString();  // "C:\Users\alice"   -- always backslash
 ```
 
-`ToString()` is cross-platform stable. If you log an `MPath` on Linux and read the log on Windows, you get the same text. Use `ToNativeString()` only when you're handing the path to an OS-native API that expects native separators.
+`ToString()` is cross-platform stable. If you log an `MPath` on Linux and read the log on Windows, 
+you get the same text. Use `ToNativeString()` only when you're handing the path to an OS-native API 
+that expects native separators.
 
 ## Joining
 
@@ -168,11 +180,13 @@ public static class AppPaths
 var file = MPath.From("data/settings.json", AppPaths.Options);
 ```
 
-The record's `with` expression is the ergonomic way to override per-call or wrap a static accessor for process-wide defaults.
+The record's `with` expression is the ergonomic way to override per-call or wrap a static accessor 
+for process-wide defaults.
 
 ## Serialization
 
-Built-in. The `[JsonConverter]` and `[TypeConverter]` attributes on `MPath` wire up automatically. No registration required.
+Built-in. The `[JsonConverter]` and `[TypeConverter]` attributes on `MPath` wire up automatically. 
+No registration required.
 
 ```csharp
 // System.Text.Json

@@ -28,11 +28,9 @@ public static class MPathComparer {
 
     private sealed class Impl : IEqualityComparer<MPath> {
         private readonly StringComparer _comparer;
-        private readonly StringComparison _comparison;
 
         public Impl(StringComparison comparison)
         {
-            _comparison = comparison;
             _comparer = StringComparer.FromComparison(comparison);
         }
 
@@ -44,7 +42,7 @@ public static class MPathComparer {
             if (x is null || y is null)
                 return false;
 
-            return string.Equals(x.ToUnixString(), y.ToUnixString(), _comparison);
+            return _comparer.Equals(x.ToUnixString(), y.ToUnixString());
         }
 
         public int GetHashCode(MPath obj)
