@@ -640,28 +640,28 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// (archive entries, HTTP filenames, config values) under a trusted base.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// This is a <strong>lexical</strong> check -- it operates on the normalized string form
-    /// and does not touch the filesystem. It rejects `../etc/passwd`-style escape and also
-    /// rejects sibling-prefix false positives (e.g. `/var/www-evil` is NOT contained in
-    /// `/var/www`). Leading directory separators on <paramref name="segment" /> are stripped
-    /// before resolution, so the segment is always treated as relative to this path --
-    /// consistent with the `/` operator.
-    /// </para>
-    /// <para>
-    /// This is <strong>NOT</strong> a security boundary for attacker-controlled filesystems.
-    /// It does NOT resolve symlinks, does NOT prevent TOCTOU races, and does NOT handle
-    /// NTFS per-directory case-sensitivity divergence. If the filesystem contains
-    /// attacker-placed symlinks (multi-tenant servers, untrusted archive extraction,
-    /// attacker-supplied Docker volumes), canonicalize via
-    /// <see cref="FileInfo.ResolveLinkTarget(bool)" /> with `returnFinalTarget: true` before
-    /// calling this method, and use atomic file-open APIs with `FileOptions.NoLinkFollow`
-    /// (.NET 10+) or `O_NOFOLLOW` P/Invoke for race-free access.
-    /// </para>
-    /// <para>
-    /// Use <see cref="TryResolveContained" /> in hot paths (ZIP extraction loops, per-request
-    /// filename validation) to avoid the exception-allocation cost when rejection is common.
-    /// </para>
+    ///     <para>
+    ///     This is a <strong>lexical</strong> check -- it operates on the normalized string form
+    ///     and does not touch the filesystem. It rejects `../etc/passwd`-style escape and also
+    ///     rejects sibling-prefix false positives (e.g. `/var/www-evil` is NOT contained in
+    ///     `/var/www`). Leading directory separators on <paramref name="segment" /> are stripped
+    ///     before resolution, so the segment is always treated as relative to this path --
+    ///     consistent with the `/` operator.
+    ///     </para>
+    ///     <para>
+    ///     This is <strong>NOT</strong> a security boundary for attacker-controlled filesystems.
+    ///     It does NOT resolve symlinks, does NOT prevent TOCTOU races, and does NOT handle
+    ///     NTFS per-directory case-sensitivity divergence. If the filesystem contains
+    ///     attacker-placed symlinks (multi-tenant servers, untrusted archive extraction,
+    ///     attacker-supplied Docker volumes), canonicalize via
+    ///     <see cref="FileInfo.ResolveLinkTarget(bool)" /> with `returnFinalTarget: true` before
+    ///     calling this method, and use atomic file-open APIs with `FileOptions.NoLinkFollow`
+    ///     (.NET 10+) or `O_NOFOLLOW` P/Invoke for race-free access.
+    ///     </para>
+    ///     <para>
+    ///     Use <see cref="TryResolveContained" /> in hot paths (ZIP extraction loops, per-request
+    ///     filename validation) to avoid the exception-allocation cost when rejection is common.
+    ///     </para>
     /// </remarks>
     /// <param name="segment">
     /// Relative path fragment to append under this path. Leading `/` or `\` is stripped.
@@ -699,17 +699,17 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// characters, and lexical escape.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// Recommended for hot paths -- ZIP extraction loops, per-request filename checks,
-    /// bulk validation. Avoids the allocation cost of constructing an
-    /// <see cref="InvalidPathException" /> on rejection.
-    /// </para>
-    /// <para>
-    /// Only <see cref="ArgumentNullException" /> escapes this method. Null
-    /// <paramref name="segment" /> stays loud, mirroring <see cref="TryFrom" />'s contract.
-    /// All other failure modes return <see langword="false" /> with <paramref name="result" />
-    /// set to <see langword="null" />.
-    /// </para>
+    ///     <para>
+    ///     Recommended for hot paths -- ZIP extraction loops, per-request filename checks,
+    ///     bulk validation. Avoids the allocation cost of constructing an
+    ///     <see cref="InvalidPathException" /> on rejection.
+    ///     </para>
+    ///     <para>
+    ///     Only <see cref="ArgumentNullException" /> escapes this method. Null
+    ///     <paramref name="segment" /> stays loud, mirroring <see cref="TryFrom" />'s contract.
+    ///     All other failure modes return <see langword="false" /> with <paramref name="result" />
+    ///     set to <see langword="null" />.
+    ///     </para>
     /// </remarks>
     /// <param name="segment">
     /// Relative path fragment to append under this path. Leading `/` or `\` is stripped.
@@ -780,7 +780,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         // two-arg overload only, no filesystem I/O, no single-arg CWD footgun.
         NormalizationResult normalized;
         try {
-            normalized = PathNormalizer.Normalize(stripped, MPathOptions.Default, relativeTo: _path);
+            normalized = PathNormalizer.Normalize(stripped, MPathOptions.Default, _path);
         } catch (InvalidPathException ex) {
             // PathNormalizer already built a consumer-friendly reason; surface it.
             // We can't preserve its full message shape without allocating the exception,
@@ -795,7 +795,8 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         // D-37 containment check: segment-boundary guard, not naive StartsWith.
         if (!IsContained(_path, normalized.Normalized)) {
             result = null;
-            failureReason = $"Segment normalizes above the base path '{_path}'. Use a segment that stays within the boundary";
+            failureReason =
+                    $"Segment normalizes above the base path '{_path}'. Use a segment that stays within the boundary";
 
             return false;
         }

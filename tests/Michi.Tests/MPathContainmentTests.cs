@@ -20,10 +20,6 @@ public sealed class MPathContainmentTests {
     private static readonly string BaseWwwPath =
             PlatformTestHelpers.IsWindows ? @"C:\var\www" : "/var/www";
 
-    private static MPath BaseUploads() => MPath.From(BaseUploadsPath);
-
-    private static MPath BaseWww() => MPath.From(BaseWwwPath);
-
     // D-47: reusable ZIP-slip attack corpus. Future phases (HIER-01 when it lands) can
     // reference this via [MemberData(nameof(LexicalEscapeAttempts))] for regression
     // coverage without re-listing the vectors.
@@ -48,11 +44,26 @@ public sealed class MPathContainmentTests {
     // keep the expected shape platform-appropriate.
     public static IEnumerable<object[]> ContainedSuccesses =>
             new[] {
-                new object[] { "file.txt", "file.txt" },
-                new object[] { "sub/nested.txt", "sub/nested.txt" },
-                new object[] { "deep/./././nested", "deep/nested" },
-                new object[] { "a/../b", "b" },
-                new object[] { "/file.txt", "file.txt" }, // D-42: leading-slash stripped
+                new object[] {
+                    "file.txt",
+                    "file.txt",
+                },
+                new object[] {
+                    "sub/nested.txt",
+                    "sub/nested.txt",
+                },
+                new object[] {
+                    "deep/./././nested",
+                    "deep/nested",
+                },
+                new object[] {
+                    "a/../b",
+                    "b",
+                },
+                new object[] {
+                    "/file.txt",
+                    "file.txt",
+                }, // D-42: leading-slash stripped
             };
 
     // D-46 / P2-02: Windows-only attack vectors. Backslash-traversal variants only make
@@ -63,6 +74,10 @@ public sealed class MPathContainmentTests {
                 new object[] { "..\\etc\\passwd" },
                 new object[] { "sub\\..\\..\\escape" },
             };
+
+    private static MPath BaseUploads() => MPath.From(BaseUploadsPath);
+
+    private static MPath BaseWww() => MPath.From(BaseWwwPath);
 
     // ===== Test 1: lexical escape rejection (throwing variant) =====
     [Theory]
@@ -123,9 +138,7 @@ public sealed class MPathContainmentTests {
         // D-40: null stays loud even through Try*. Mirrors Phase 01 TryFrom's null contract.
         var basePath = BaseUploads();
 
-        var ex = Should.Throw<ArgumentNullException>(
-            () => basePath.TryResolveContained(null!, out _)
-        );
+        var ex = Should.Throw<ArgumentNullException>(() => basePath.TryResolveContained(null!, out _));
 
         ex.ParamName.ShouldBe("segment");
     }
@@ -172,9 +185,7 @@ public sealed class MPathContainmentTests {
         // class of bug Nuke's AbsolutePath shipped before the boundary-guard fix.
         var basePath = BaseWww();
 
-        Should.Throw<InvalidPathException>(
-            () => basePath.ResolveContained("../www-evil/file.txt")
-        );
+        Should.Throw<InvalidPathException>(() => basePath.ResolveContained("../www-evil/file.txt"));
     }
 
     // ===== Test 9a: [Pure] attribute present on ResolveContained (D-56) =====
@@ -187,8 +198,8 @@ public sealed class MPathContainmentTests {
         );
 
         method.ShouldNotBeNull();
-        method.GetCustomAttributes(typeof(PureAttribute), inherit: false)
-              .Length.ShouldBe(1);
+        method.GetCustomAttributes(typeof(PureAttribute), false)
+               .Length.ShouldBe(1);
     }
 
     // ===== Test 9b: [Pure] NOT applied to TryResolveContained (D-56) =====
@@ -200,8 +211,8 @@ public sealed class MPathContainmentTests {
         var method = typeof(MPath).GetMethod(nameof(MPath.TryResolveContained));
 
         method.ShouldNotBeNull();
-        method.GetCustomAttributes(typeof(PureAttribute), inherit: false)
-              .Length.ShouldBe(0);
+        method.GetCustomAttributes(typeof(PureAttribute), false)
+               .Length.ShouldBe(0);
     }
 
     // ===== Test 10: leading-separator strip regression (D-42) =====
@@ -257,9 +268,7 @@ public sealed class MPathContainmentTests {
         // under "C:/app", so containment rejects. P2-03 pinned.
         var basePath = MPath.From(@"C:\app");
 
-        Should.Throw<InvalidPathException>(
-            () => basePath.ResolveContained("//server/share/sibling")
-        );
+        Should.Throw<InvalidPathException>(() => basePath.ResolveContained("//server/share/sibling"));
     }
 
     // ===== Test 14: exact-equality edge case (D-37 exact-match branch) =====
