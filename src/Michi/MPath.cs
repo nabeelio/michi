@@ -1,6 +1,8 @@
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -626,6 +628,211 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         var result = PathNormalizer.Normalize(sb.ToString(), MPathOptions.Default);
 
         return new(result.Normalized, result.Root);
+    }
+
+#endregion
+
+#region Containment
+
+    /// <summary>
+    /// Resolves <paramref name="segment" /> against this path and verifies the result does not
+    /// escape via `..` traversal. Use this to safely join user-supplied path fragments
+    /// (archive entries, HTTP filenames, config values) under a trusted base.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is a <strong>lexical</strong> check -- it operates on the normalized string form
+    /// and does not touch the filesystem. It rejects `../etc/passwd`-style escape and also
+    /// rejects sibling-prefix false positives (e.g. `/var/www-evil` is NOT contained in
+    /// `/var/www`). Leading directory separators on <paramref name="segment" /> are stripped
+    /// before resolution, so the segment is always treated as relative to this path --
+    /// consistent with the `/` operator.
+    /// </para>
+    /// <para>
+    /// This is <strong>NOT</strong> a security boundary for attacker-controlled filesystems.
+    /// It does NOT resolve symlinks, does NOT prevent TOCTOU races, and does NOT handle
+    /// NTFS per-directory case-sensitivity divergence. If the filesystem contains
+    /// attacker-placed symlinks (multi-tenant servers, untrusted archive extraction,
+    /// attacker-supplied Docker volumes), canonicalize via
+    /// <see cref="FileInfo.ResolveLinkTarget(bool)" /> with `returnFinalTarget: true` before
+    /// calling this method, and use atomic file-open APIs with `FileOptions.NoLinkFollow`
+    /// (.NET 10+) or `O_NOFOLLOW` P/Invoke for race-free access.
+    /// </para>
+    /// <para>
+    /// Use <see cref="TryResolveContained" /> in hot paths (ZIP extraction loops, per-request
+    /// filename validation) to avoid the exception-allocation cost when rejection is common.
+    /// </para>
+    /// </remarks>
+    /// <param name="segment">
+    /// Relative path fragment to append under this path. Leading `/` or `\` is stripped.
+    /// </param>
+    /// <returns>
+    /// A new <see cref="MPath" /> that is either equal to this path or a descendant of it.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="segment" /> is null.
+    /// </exception>
+    /// <exception cref="InvalidPathException">
+    /// <paramref name="segment" /> is empty, whitespace-only, or resolves to no change
+    /// (bare `.` or `..`); contains invalid characters; or normalizes to a path above this
+    /// path's boundary.
+    /// </exception>
+    [Pure]
+    public MPath ResolveContained(string segment)
+    {
+        Guard.NotNull(
+            segment,
+            "Segment cannot be null. Pass a non-null relative path fragment; use TryResolveContained for empty/invalid input handling."
+        );
+
+        if (!TryResolveContainedCore(segment, out var result, out var failureReason)) {
+            throw new InvalidPathException(segment, failureReason!);
+        }
+
+        return result!;
+    }
+
+    /// <summary>
+    /// Non-throwing counterpart to <see cref="ResolveContained" />. Returns
+    /// <see langword="false" /> for any reason <see cref="ResolveContained" /> would throw
+    /// <see cref="InvalidPathException" />, including empty/pure-dots input, invalid
+    /// characters, and lexical escape.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Recommended for hot paths -- ZIP extraction loops, per-request filename checks,
+    /// bulk validation. Avoids the allocation cost of constructing an
+    /// <see cref="InvalidPathException" /> on rejection.
+    /// </para>
+    /// <para>
+    /// Only <see cref="ArgumentNullException" /> escapes this method. Null
+    /// <paramref name="segment" /> stays loud, mirroring <see cref="TryFrom" />'s contract.
+    /// All other failure modes return <see langword="false" /> with <paramref name="result" />
+    /// set to <see langword="null" />.
+    /// </para>
+    /// </remarks>
+    /// <param name="segment">
+    /// Relative path fragment to append under this path. Leading `/` or `\` is stripped.
+    /// </param>
+    /// <param name="result">
+    /// On success, the resolved contained <see cref="MPath" />; on failure,
+    /// <see langword="null" />.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <paramref name="segment" /> resolves to a path contained
+    /// under this path; <see langword="false" /> otherwise.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="segment" /> is null.
+    /// </exception>
+    public bool TryResolveContained(string segment, [NotNullWhen(true)] out MPath? result)
+    {
+        Guard.NotNull(
+            segment,
+            "Segment cannot be null. Pass a non-null relative path fragment; use TryResolveContained for empty/invalid input handling."
+        );
+
+        return TryResolveContainedCore(segment, out result, out _);
+    }
+
+    // Shared validation + normalization + containment check. Returns true on success; on
+    // failure, sets `failureReason` to a message fragment suitable for InvalidPathException's
+    // `reason` parameter. The reason string is cheap; the caller of ResolveContained builds
+    // the full exception from it. TryResolveContained discards the reason entirely -- no
+    // exception object is ever allocated in the non-throwing path (P2-04).
+    //
+    // Maintainer note: this helper is the single source of truth for D-37 (segment-boundary
+    // guard), D-41 (empty/pure-dots reject), D-42 (leading-separator strip), and D-43
+    // (normalizes-above rejection). Both public methods delegate here to keep the two
+    // behaviors symmetric. See .planning/phases/02-hierarchy-security-scope/02-CONTEXT.md
+    // for the decision rationale; the lexical-only scope (no symlink canonicalization) is
+    // an explicit project-level out-of-scope per PROJECT.md "Symlink-aware operations --
+    // consumers canonicalize via FileInfo.ResolveLinkTarget". In-library canonicalization
+    // would mean blocking I/O, TOCTOU-unsafe behavior, and an async-required API. Consumers
+    // in adversarial-filesystem threat models drop to platform P/Invoke (openat +
+    // O_NOFOLLOW on Unix) or .NET 10's FileOptions.NoLinkFollow.
+    private bool TryResolveContainedCore(
+        string segment,
+        out MPath? result,
+        out string? failureReason
+    )
+    {
+        // D-42: strip exactly ONE leading separator so the segment is always relative.
+        // Do NOT use TrimStart (which strips multiple) -- UNC-like "//server/share" on
+        // Windows should only lose one separator per P2-03.
+        var stripped = segment.Length > 0 && segment[0] is '/' or '\\'
+                ? segment.Substring(1)
+                : segment;
+
+        // D-41: empty, '.', '..', or whitespace-only reject as InvalidPathException.
+        // These indicate a programmer bug (no-change target) rather than an escape attempt.
+        // The ORIGINAL segment is preserved in the exception for caller context; the
+        // stripped form is library-internal noise.
+        if (string.IsNullOrWhiteSpace(stripped) || stripped is "." or "..") {
+            result = null;
+            failureReason = "Segment is empty or resolves to no change ('', '.', '..' alone are not valid targets)";
+
+            return false;
+        }
+
+        // D-43 + reuse Phase 01: delegate normalization to PathNormalizer with this path as
+        // the `relativeTo` base. That internally uses Path.GetFullPath(path, basePath) --
+        // two-arg overload only, no filesystem I/O, no single-arg CWD footgun.
+        NormalizationResult normalized;
+        try {
+            normalized = PathNormalizer.Normalize(stripped, MPathOptions.Default, relativeTo: _path);
+        } catch (InvalidPathException ex) {
+            // PathNormalizer already built a consumer-friendly reason; surface it.
+            // We can't preserve its full message shape without allocating the exception,
+            // so we surface the Reason and let ResolveContained re-wrap. TryResolveContained
+            // just sees failure and returns false.
+            result = null;
+            failureReason = ex.Reason;
+
+            return false;
+        }
+
+        // D-37 containment check: segment-boundary guard, not naive StartsWith.
+        if (!IsContained(_path, normalized.Normalized)) {
+            result = null;
+            failureReason = $"Segment normalizes above the base path '{_path}'. Use a segment that stays within the boundary";
+
+            return false;
+        }
+
+        result = new(normalized.Normalized, normalized.Root);
+        failureReason = null;
+
+        return true;
+    }
+
+    // D-37 segment-boundary guard. Either (a) candidate equals ancestor exactly, or
+    // (b) the character immediately after the ancestor prefix is the canonical separator.
+    // PathNormalizer always produces forward-slash internally, so '/' is the only
+    // separator to check -- never '\\'. Uses HostOs.PathComparison per D-39 (the single
+    // comparison source), which is OrdinalIgnoreCase on Windows and macOS, Ordinal on Linux.
+    // No culture-sensitive comparison anywhere (AGENTS.md non-negotiable rule 4).
+    //
+    // Span-based compare avoids the allocation of `candidate.Substring(0, ancestor.Length)`
+    // that a plain string.Equals would force.
+    private static bool IsContained(string ancestor, string candidate)
+    {
+        if (candidate.Length < ancestor.Length) {
+            return false;
+        }
+
+        if (!candidate.AsSpan(0, ancestor.Length).Equals(ancestor.AsSpan(), HostOs.PathComparison)) {
+            return false;
+        }
+
+        // Exact equality: allowed (e.g. "a/.." normalizes to the base exactly).
+        if (candidate.Length == ancestor.Length) {
+            return true;
+        }
+
+        // Boundary guard: reject "/var/www-evil" under "/var/www". The next character after
+        // the ancestor prefix must be the canonical forward-slash separator.
+        return candidate[ancestor.Length] == '/';
     }
 
 #endregion
