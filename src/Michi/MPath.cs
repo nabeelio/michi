@@ -807,12 +807,44 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return true;
     }
 
-    // D-37 segment-boundary guard. Either (a) candidate equals ancestor exactly, or
-    // (b) the character immediately after the ancestor prefix is the canonical separator.
-    // PathNormalizer always produces forward-slash internally, so '/' is the only
-    // separator to check -- never '\\'. Uses HostOs.PathComparison per D-39 (the single
-    // comparison source), which is OrdinalIgnoreCase on Windows and macOS, Ordinal on Linux.
-    // No culture-sensitive comparison anywhere (AGENTS.md non-negotiable rule 4).
+    // NOTE on what this helper is and isn't:
+    //
+    // This is a LEXICAL containment check. It operates on already-normalized strings produced
+    // by PathNormalizer.Normalize, which resolves `..`/`./` via Path.GetFullPath's two-arg
+    // overload -- pure string math, no filesystem I/O.
+    //
+    // It does NOT canonicalize symlinks, and deliberately so. The temptation to "upgrade"
+    // ResolveContained to call FileInfo.ResolveLinkTarget before the containment check keeps
+    // coming up; resist it. Reasons, in order of how they'll bite you:
+    //
+    //   1. Blocking I/O in a sync API. FileInfo.ResolveLinkTarget hits the filesystem. On a
+    //      stale NFS or SMB mount this blocks for minutes. MPath.ResolveContained is
+    //      documented as pure and [Pure]-attributed, callable from async hot paths
+    //      (per-request filename sanitization, ZIP extraction loops). Adding blocking I/O
+    //      is a breaking change even if the signature stays identical.
+    //   2. TOCTOU-unsafe even after canonicalization. An attacker can replace the path with
+    //      a symlink between the check here and the caller's actual File.Open call.
+    //      Canonicalizing inside the library gives the caller a false sense of security --
+    //      worse than no canonicalization at all, because the docs then have to walk it back.
+    //   3. Race-free containment requires OS-specific P/Invoke: `openat` + `O_NOFOLLOW` on
+    //      Unix, `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT` on Windows. That is
+    //      explicitly out of scope per .planning/PROJECT.md "Symlink-aware operations --
+    //      consumers canonicalize via FileInfo.ResolveLinkTarget." A future Michi.FileSystem
+    //      package may offer ResolveContainedCanonical once the async / cancellation-token
+    //      story is worked out in the core library.
+    //
+    // What consumers with adversarial-filesystem threat models should do is documented in
+    // the XML remarks on ResolveContained and in the README Security section. Do not expand
+    // this helper to handle symlinks; expand the docs instead.
+    //
+    // --- D-37 implementation notes ---
+    //
+    // Segment-boundary guard. Either (a) candidate equals ancestor exactly, or (b) the
+    // character immediately after the ancestor prefix is the canonical separator.
+    // PathNormalizer always produces forward-slash internally, so '/' is the only separator
+    // to check -- never '\\'. Uses HostOs.PathComparison per D-39 (the single comparison
+    // source), which is OrdinalIgnoreCase on Windows and macOS, Ordinal on Linux. No
+    // culture-sensitive comparison anywhere (AGENTS.md non-negotiable rule 4).
     //
     // Span-based compare avoids the allocation of `candidate.Substring(0, ancestor.Length)`
     // that a plain string.Equals would force.
