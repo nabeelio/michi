@@ -4,7 +4,7 @@
     <TargetFrameworks>netstandard2.1;net8.0;net10.0</TargetFrameworks>
     <RootNamespace>Michi</RootNamespace>
     <PackageId>Michi</PackageId>
-    <Title>MPath</Title>
+    <Title>Michi</Title>
     <IsPackable>true</IsPackable>
     <!-- Preserve [Pure] attribute emission. System.Diagnostics.Contracts.PureAttribute is
          decorated with [Conditional("CONTRACTS_FULL")], which means the C# compiler strips

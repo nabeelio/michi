@@ -20,7 +20,7 @@
        EmbedUntrackedSources, PublishRepositoryUrl) are not set here yet. -->
   <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('src'))">
     <Authors>Nabeel Shahzad</Authors>
-    <Company>nabeelio</Company>
+    <Company>vmslabs</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/nabeelio/michi</PackageProjectUrl>
     <RepositoryUrl>https://github.com/nabeelio/michi</RepositoryUrl>
