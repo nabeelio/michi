@@ -309,6 +309,80 @@ var back = JsonSerializer.Deserialize<MPath>(json);        // round-trips
 
 Round-trip uses the canonical forward-slash form, so a Windows-serialized path reads correctly on Linux.
 
+## Security
+
+### Untrusted input
+
+When a path segment comes from outside your process -- a ZIP archive entry, an HTTP request, a
+config value, an environment variable -- you need containment, not just normalization. `MPath.Format`
+and the `/` operator happily normalize `../` segments, which means user input can escape the intended
+base directory (CWE-22 / ZIP-slip). `ResolveContained` is the opposite: it normalizes AND verifies
+the result stays under the base.
+
+```csharp
+var uploads = MPath.From("/var/www/uploads");
+
+// ❌ DANGEROUS -- user input can traverse. Normalization happily resolves `../`.
+var target = MPath.Format("/var/www/uploads/{0}", httpFilename);
+// if httpFilename = "../../etc/passwd", target = "/etc/passwd" with no warning.
+
+// ✅ SAFE -- escape attempts throw.
+var target = uploads.ResolveContained(httpFilename);
+// throws InvalidPathException when httpFilename escapes the uploads directory.
+
+// ✅ SAFE, non-throwing -- useful in per-request or per-archive-entry hot paths.
+if (uploads.TryResolveContained(httpFilename, out var safe))
+{
+    File.WriteAllBytes(safe.Path, bytes);
+}
+else
+{
+    return Results.BadRequest("filename must stay under the uploads directory");
+}
+```
+
+### What `ResolveContained` does and doesn't
+
+✅ Rejects lexical escape -- `../../etc/passwd`, `subdir/../../escape`, and every `..`-traversal
+variant throws `InvalidPathException`.
+✅ Rejects sibling-directory false positives -- `/var/www-evil` is NOT contained in `/var/www`, even
+though one is a string prefix of the other. The guard is a segment boundary, not a `StartsWith`.
+✅ Strips leading separators -- `base.ResolveContained("/etc/passwd")` joins to `base/etc/passwd`,
+never to `/etc/passwd`. User input can't accidentally escape by starting with `/`.
+✅ Is pure and fast -- no filesystem I/O, no exception allocated on the `TryResolveContained` path,
+safe to call from async hot paths and per-request sanitization loops.
+
+❌ Does NOT resolve symlinks -- if the filesystem contains attacker-placed symlinks (multi-tenant
+servers, user-supplied archive extraction, containers mounting untrusted volumes), a "contained"
+`MPath` can still read or write a target outside the base. That is CWE-59 territory and needs
+filesystem-layer mitigation, not path math.
+❌ Does NOT prevent TOCTOU races -- even after canonicalization, an attacker can swap the path for
+a symlink between your check and your I/O call.
+❌ Does NOT validate against case-sensitivity mismatches -- NTFS directories with per-directory
+case-sensitivity flags (Windows Subsystem for Linux interop) are not inspected; `ResolveContained`
+uses the host-OS default.
+
+### Adversarial filesystems
+
+If your threat model includes attacker-placed symlinks on the filesystem you're reading from
+(multi-tenant file servers, user-uploaded archive extraction, containers mounting untrusted
+volumes), `ResolveContained` is not sufficient on its own. The mitigations live at the I/O layer,
+not in path math:
+
+- **Canonicalize before checking:** call `FileInfo.ResolveLinkTarget(returnFinalTarget: true)` to
+  resolve symlinks to their final target, then run `ResolveContained` against the canonicalized
+  result. Still subject to TOCTOU -- the link can change between the check and the open.
+- **Atomic no-follow file opens:** on .NET 10+, pass `FileOptions.NoLinkFollow` to `FileStream`/
+  `File.Open` to refuse to open a path if any component is a symlink.
+- **Race-free sandboxing requires P/Invoke:** on Unix, `openat` + `O_NOFOLLOW`; on Windows,
+  `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT`. Michi does not wrap these -- they are
+  OS-specific and the correct abstraction depends on your host setup.
+
+A future `Michi.FileSystem` package may offer a `ResolveContainedCanonical` variant that combines
+canonicalization with containment once the async / cancellation-token story lands in the core
+library. Until then, security-aware consumers compose `ResolveContained` with the I/O-layer
+mitigations above.
+
 ## What it doesn't do
 
 - No implicit `string` to `MPath` or `MPath` to `string` conversions. Use `MPath.From(s)` to construct and `p.Path` (or `p.ToString()`) to extract the string. Implicit conversions make it too easy to lose the type and start mixing raw strings back into your code.
