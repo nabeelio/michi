@@ -6,6 +6,15 @@
     <PackageId>Michi</PackageId>
     <Title>MPath</Title>
     <IsPackable>true</IsPackable>
+    <!-- Preserve [Pure] attribute emission. System.Diagnostics.Contracts.PureAttribute is
+         decorated with [Conditional("CONTRACTS_FULL")], which means the C# compiler strips
+         it from call sites when the symbol is NOT defined. Defining it here keeps the
+         attribute in compiled metadata so runtime reflection (Phase 02 D-56 invariant
+         test, and CA1806 unused-return-value diagnostics at consumer call sites) can
+         observe it. We do NOT use Contract.Requires / Contract.Ensures / etc., so this
+         symbol has no other effect on compilation (those are the only other members
+         gated by the same symbol). -->
+    <DefineConstants>$(DefineConstants);CONTRACTS_FULL</DefineConstants>
   </PropertyGroup>
 
   <!-- System.Text.Json is in-box on net8.0+ but ships as a NuGet package on netstandard2.1.
