@@ -36,6 +36,68 @@ public class MPathMutationTests {
         ex.Message.ShouldContain("non-empty segment string");
     }
 
+    [Fact]
+    public void WithName_Empty_PreservesOriginalFailureWording()
+    {
+        var path = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\a\file.txt" : "/a/file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithName(string.Empty));
+
+        ex.AttemptedPath.ShouldBe(string.Empty);
+        ex.Reason.ShouldBe("Name is empty. Pass a non-empty segment string");
+        ex.Message.ShouldBe("Invalid path '': Name is empty. Pass a non-empty segment string.");
+    }
+
+    [Fact]
+    public void WithName_Dot_Throws()
+    {
+        var path = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\a\file.txt" : "/a/file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithName("."));
+
+        ex.Message.ShouldContain("single path segment");
+    }
+
+    [Fact]
+    public void WithName_DoubleDot_Throws()
+    {
+        var path = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\a\file.txt" : "/a/file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithName(".."));
+
+        ex.Message.ShouldContain("single path segment");
+    }
+
+    [Fact]
+    public void WithName_ReservedDeviceNameOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a\file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithName("NUL"));
+
+        ex.Message.ShouldContain("reserved device name");
+    }
+
+    [Fact]
+    public void WithName_TrailingDotOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a\file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithName("name."));
+
+        ex.Message.ShouldContain("must not end with '.' or space");
+    }
+
+    [Fact]
+    public void WithName_TrailingSpaceOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a\file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithName("name "));
+
+        ex.Message.ShouldContain("must not end with '.' or space");
+    }
+
     // WithExtension accepts leading-dot or no-dot form.
     [Fact]
     public void WithExtension_AcceptsBothDotAndNoDot()
@@ -78,6 +140,57 @@ public class MPathMutationTests {
         ex.AttemptedPath.ShouldBe(".");
         ex.Message.ShouldContain("Extension '.' is not valid");
         ex.Message.ShouldContain("Use WithoutExtension() to remove");
+    }
+
+    [Fact]
+    public void WithExtension_InvalidCharacterOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a\file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithExtension("bad*name"));
+
+        ex.Message.ShouldContain("invalid path character");
+    }
+
+    [Fact]
+    public void WithExtension_TrailingDotOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a\file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithExtension("bad."));
+
+        ex.Message.ShouldContain("must not end with '.' or space");
+    }
+
+    [Fact]
+    public void WithExtension_TrailingSpaceOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a\file.txt");
+        var ex = Should.Throw<InvalidPathException>(() => path.WithExtension("bad "));
+
+        ex.Message.ShouldContain("must not end with '.' or space");
+    }
+
+    [Fact]
+    public void InvalidSingleSegmentRule_IsSharedAcrossJoinWithNameAndWithExtension_OnMacOS()
+    {
+        if (!PlatformTestHelpers.IsMacOS) {
+            Assert.Skip("Test is macOS-only.");
+        }
+
+        var directory = MPath.From("/a");
+        var file = MPath.From("/a/file.txt");
+
+        var join = Should.Throw<InvalidPathException>(() => _ = directory / "bad:name");
+        var rename = Should.Throw<InvalidPathException>(() => file.WithName("bad:name"));
+        var extension = Should.Throw<InvalidPathException>(() => file.WithExtension("bad:name"));
+
+        rename.Reason.ShouldBe(join.Reason);
+        extension.Reason.ShouldBe(join.Reason);
     }
 
     // WithoutExtension strips the trailing extension.

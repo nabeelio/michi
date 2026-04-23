@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Michi.Exceptions;
 
 namespace Michi.Internal;
@@ -24,6 +25,11 @@ internal readonly record struct NormalizationResult(string Normalized, string Ro
 /// only. The single-arg form reads the mutable process CWD and is never used here.
 /// </remarks>
 internal static class PathNormalizer {
+    private static readonly char[] DirectorySeparators = [
+        '/',
+        '\\',
+    ];
+
     /// <summary>Normalizes <paramref name="path" /> into a canonical absolute form.</summary>
     /// <exception cref="ArgumentNullException"><paramref name="path" /> or <paramref name="options" /> is null.</exception>
     /// <exception cref="InvalidPathException">
@@ -88,13 +94,153 @@ internal static class PathNormalizer {
             }
         }
 
-        // Per-platform invalid-char check, cited from authoritative sources (MS "Naming a File"
-        // for Windows, POSIX §3.170 for Linux, Finder/Carbon legacy for macOS). See
-        // HostOs.InvalidSegmentChars for the data + citations, Guard.InvalidSegmentChar for the
-        // scan. Separators are never in the invalid set, so a single IndexOfAny over the tail
-        // works without splitting on '/'.
-        Guard.InvalidSegmentChar(normalized, root, attempted);
+        // Validate the normalized tail. Unix-like hosts still use a flat invalid-char scan;
+        // Windows walks segments once so invalid characters and segment-shape rules share one
+        // post-normalization pipeline.
+        ValidateNormalizedPath(normalized, root, attempted);
 
         return new(normalized, root);
+    }
+
+    /// <summary>
+    /// Validates a caller-supplied single path segment against the same lexical invariants used by
+    /// <see cref="Normalize" /> for a single segment: non-empty, no separators, not `.`/`..`, no
+    /// platform-invalid segment characters, and on Windows no reserved device names or trailing
+    /// `.` / space.
+    /// </summary>
+    /// <param name="segment">The single segment to validate.</param>
+    /// <param name="segmentLabel">Human-readable label used in exception messages.</param>
+    /// <exception cref="InvalidPathException"><paramref name="segment" /> is not a valid single path segment.</exception>
+    internal static void ValidSinglePathSegment(string segment, string segmentLabel)
+    {
+        if (segment.Length == 0) {
+            throw new InvalidPathException(segment, $"{segmentLabel} is empty. Pass a non-empty single path segment.");
+        }
+
+        if (segment.IndexOfAny(DirectorySeparators) >= 0) {
+            throw new InvalidPathException(
+                segment,
+                $"{segmentLabel} '{segment}' contains a directory separator. Use the / operator or Join() to compose multi-segment paths."
+            );
+        }
+
+        if (segment is "." or "..") {
+            throw new InvalidPathException(
+                segment,
+                $"{segmentLabel} '{segment}' is not a valid single path segment. Use a normal segment name instead."
+            );
+        }
+
+        ThrowIfInvalidSegmentChar(segment.AsSpan(), segment);
+        ValidPlatformSinglePathSegment(segment.AsSpan(), segment);
+    }
+
+    private static void ValidateNormalizedPath(string normalized, string root, string attempted)
+    {
+        var tail = normalized.Length > root.Length ? normalized[root.Length..] : string.Empty;
+        if (tail.Length == 0) {
+            return;
+        }
+
+        if (!HostOs.IsWindows) {
+            InvalidSegmentChar(normalized, root, attempted);
+
+            return;
+        }
+
+        string? deferredPlatformReason = null;
+        var remaining = tail.AsSpan();
+
+        while (remaining.Length > 0) {
+            var separatorIndex = remaining.IndexOf('/');
+            var segment = separatorIndex >= 0 ? remaining[..separatorIndex] : remaining;
+
+            if (segment.Length > 0) {
+                ThrowIfInvalidSegmentChar(segment, attempted);
+
+                if (deferredPlatformReason is null
+                 && TryGetPlatformSinglePathSegmentError(segment, out var reason)) {
+                    deferredPlatformReason = reason;
+                }
+            }
+
+            if (separatorIndex < 0) {
+                break;
+            }
+
+            remaining = remaining[(separatorIndex + 1)..];
+        }
+
+        if (deferredPlatformReason is not null) {
+            throw new InvalidPathException(attempted, deferredPlatformReason);
+        }
+    }
+
+    private static void ValidPlatformSinglePathSegment(ReadOnlySpan<char> segment, string attempted)
+    {
+        if (TryGetPlatformSinglePathSegmentError(segment, out var reason)) {
+            throw new InvalidPathException(attempted, reason);
+        }
+    }
+
+    private static void InvalidSegmentChar(string normalized, string root, string attempted)
+    {
+        var tail = normalized.Length > root.Length ? normalized[root.Length..] : string.Empty;
+        ThrowIfInvalidSegmentChar(tail.AsSpan(), attempted);
+    }
+
+    private static bool TryGetPlatformSinglePathSegmentError(
+        ReadOnlySpan<char> segment,
+        [NotNullWhen(true)] out string? reason
+    )
+    {
+        reason = null;
+        if (!HostOs.IsWindows || segment.Length == 0) {
+            return false;
+        }
+
+        if (segment[^1] is '.' or ' ') {
+            reason = $"Windows path segment '{segment.ToString()}' must not end with '.' or space.";
+
+            return true;
+        }
+
+        var extensionIndex = segment.IndexOf('.');
+        var stem = extensionIndex >= 0 ? segment[..extensionIndex] : segment;
+        var isReservedStem = stem.Equals("CON", StringComparison.OrdinalIgnoreCase)
+                          || stem.Equals("PRN", StringComparison.OrdinalIgnoreCase)
+                          || stem.Equals("AUX", StringComparison.OrdinalIgnoreCase)
+                          || stem.Equals("NUL", StringComparison.OrdinalIgnoreCase)
+                          || stem.Length == 4
+                          && stem[3] is >= '1' and <= '9' or '\u00B9' or '\u00B2' or '\u00B3'
+                          && (stem[..3].Equals("COM", StringComparison.OrdinalIgnoreCase)
+                           || stem[..3].Equals("LPT", StringComparison.OrdinalIgnoreCase));
+
+        if (!isReservedStem) {
+            return false;
+        }
+
+        reason = $"Windows path segment '{segment.ToString()}' uses reserved device name '{stem.ToString()}'.";
+
+        return true;
+    }
+
+    private static void ThrowIfInvalidSegmentChar(ReadOnlySpan<char> value, string attempted)
+    {
+        var badIndex = value.IndexOfAny(HostOs.InvalidSegmentChars);
+        if (badIndex < 0) {
+            return;
+        }
+
+        ThrowInvalidSegmentChar(attempted, value[badIndex]);
+    }
+
+    private static void ThrowInvalidSegmentChar(string attempted, char ch)
+    {
+        throw new InvalidPathException(
+            attempted,
+            $"Contains invalid path character '{(char.IsControl(ch) ? ' ' : ch)}' (0x{(int) ch:X4}). "
+          + "Platform-specific invalid-char set is documented on HostOs.InvalidSegmentChars"
+        );
     }
 }

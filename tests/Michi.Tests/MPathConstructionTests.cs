@@ -1,3 +1,4 @@
+using Michi.Exceptions;
 using Michi.Tests.Internal;
 using Shouldly;
 using Xunit;
@@ -26,6 +27,52 @@ public class MPathConstructionTests {
         var p = MPath.From(@"C:\foo\bar");
         p.ToUnixString().ShouldBe("C:/foo/bar");
         p.ToString().ShouldBe(@"C:\foo\bar");
+    }
+
+    [Theory]
+    [InlineData(@"C:\temp\CON", "reserved device name 'CON'")]
+    [InlineData(@"C:\temp\nul.txt", "reserved device name 'nul'")]
+    [InlineData(@"C:\temp\Lpt1.log", "reserved device name 'Lpt1'")]
+    [InlineData(@"C:\temp\NUL.tar.gz", "reserved device name 'NUL'")]
+    [InlineData("C:\\temp\\COM\u00B9.txt", "reserved device name 'COM\u00B9'")]
+    public void From_WindowsReservedDeviceName_Throws(string path, string messageFragment)
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var ex = Should.Throw<InvalidPathException>(() => MPath.From(path));
+        ex.Message.ShouldContain(messageFragment);
+    }
+
+    [Theory]
+    [InlineData(@"C:\temp\file.")]
+    [InlineData(@"C:\temp\file ")]
+    public void From_WindowsTrailingDotOrSpaceSegment_Throws(string path)
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var ex = Should.Throw<InvalidPathException>(() => MPath.From(path));
+        ex.Message.ShouldContain("must not end with '.' or space");
+    }
+
+    [Theory]
+    [InlineData(@"C:\CON\bad*name")]
+    [InlineData(@"C:\bad.\good*name")]
+    public void From_WindowsInvalidCharacter_WinsOverEarlierSegmentShapeError(string path)
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var ex = Should.Throw<InvalidPathException>(() => MPath.From(path));
+        ex.Message.ShouldContain("invalid path character");
+    }
+
+    [Theory]
+    [InlineData(@"C:\temp\COM10.txt")]
+    [InlineData(@"C:\temp\conhost.txt")]
+    public void From_WindowsReservedDeviceName_NearMisses_AreAllowed(string path)
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        Should.NotThrow(() => MPath.From(path));
     }
 
     // Null path throws ArgumentNullException with a verbose actionable message.

@@ -1,3 +1,4 @@
+using Michi.Exceptions;
 using Michi.Tests.Internal;
 using Shouldly;
 using Xunit;
@@ -75,6 +76,63 @@ public class MPathJoiningTests {
 
         var p = MPath.From("/foo");
         (p / "").ShouldBe(p);
+    }
+
+    [Fact]
+    public void SlashOperator_InvalidSingleSegmentOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a");
+        var ex = Should.Throw<InvalidPathException>(() => _ = path / "bad*name");
+
+        ex.Message.ShouldContain("invalid path character");
+    }
+
+    [Fact]
+    public void SlashOperator_ReservedDeviceNameOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a");
+        var ex = Should.Throw<InvalidPathException>(() => _ = path / "CON");
+
+        ex.Message.ShouldContain("reserved device name");
+    }
+
+    [Fact]
+    public void SlashOperator_TrailingDotOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a");
+        var ex = Should.Throw<InvalidPathException>(() => _ = path / "name.");
+
+        ex.Message.ShouldContain("must not end with '.' or space");
+    }
+
+    [Fact]
+    public void SlashOperator_TrailingSpaceOnWindows_Throws()
+    {
+        PlatformTestHelpers.SkipUnlessWindows();
+
+        var path = MPath.From(@"C:\a");
+        var ex = Should.Throw<InvalidPathException>(() => _ = path / "name ");
+
+        ex.Message.ShouldContain("must not end with '.' or space");
+    }
+
+    [Fact]
+    public void SlashOperator_InvalidSingleSegmentOnMacOS_Throws()
+    {
+        if (!PlatformTestHelpers.IsMacOS) {
+            Assert.Skip("Test is macOS-only.");
+        }
+
+        var path = MPath.From("/a");
+        var ex = Should.Throw<InvalidPathException>(() => _ = path / "bad:name");
+
+        ex.Message.ShouldContain("invalid path character");
     }
 
     // Join(params) chains segments.

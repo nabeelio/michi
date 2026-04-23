@@ -432,6 +432,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return other is null ? 1 : string.Compare(_path, other._path, HostOs.PathComparison);
     }
 
+    /// <summary>
+    /// Returns <see langword="true" /> when both paths are equal under <see cref="HostOs.PathComparer" /> semantics.
+    /// </summary>
     public static bool operator ==(MPath? left, MPath? right)
     {
         if (ReferenceEquals(left, right))
@@ -443,15 +446,34 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return left.Equals(right);
     }
 
+    /// <summary>
+    /// Returns <see langword="true" /> when the two paths are not equal under <see cref="HostOs.PathComparer" /> semantics.
+    /// </summary>
     public static bool operator !=(MPath? left, MPath? right) => !(left == right);
 
+    /// <summary>
+    /// Returns <see langword="true" /> when <paramref name="left" /> sorts before <paramref name="right" />.
+    /// <see langword="null" /> sorts before any path.
+    /// </summary>
     public static bool operator <(MPath? left, MPath? right) =>
             left is null ? right is not null : left.CompareTo(right) < 0;
 
+    /// <summary>
+    /// Returns <see langword="true" /> when <paramref name="left" /> sorts before or equal to <paramref name="right" />.
+    /// <see langword="null" /> sorts before any path.
+    /// </summary>
     public static bool operator <=(MPath? left, MPath? right) => left is null || left.CompareTo(right) <= 0;
 
+    /// <summary>
+    /// Returns <see langword="true" /> when <paramref name="left" /> sorts after <paramref name="right" />. Any path sorts
+    /// after <see langword="null" />.
+    /// </summary>
     public static bool operator >(MPath? left, MPath? right) => left is not null && left.CompareTo(right) > 0;
 
+    /// <summary>
+    /// Returns <see langword="true" /> when <paramref name="left" /> sorts after or equal to <paramref name="right" />.
+    /// <see langword="null" /> is only greater-than-or-equal to <see langword="null" />.
+    /// </summary>
     public static bool operator >=(MPath? left, MPath? right) =>
             left is null ? right is null : left.CompareTo(right) >= 0;
 
@@ -549,11 +571,12 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             return left;
         }
 
-        // Fast path: if the segment has no internal separators, no `.` or `..` components, and
-        // no invalid path chars, we can skip the full normalizer and just append. The left side
-        // is already canonical, the segment is safe, so the result is canonical by construction.
-        // Covers the overwhelmingly common case: `base / "filename.ext"`.
-        if (IsSimpleSegment(trimmed.AsSpan())) {
+        // Fast path: if the segment is a single lexical segment (no separators, not `.`/`..`),
+        // validate it against the single-segment invariant and append directly. Covers the
+        // overwhelmingly common case: `base / "filename.ext"`.
+        if (CanUseSingleSegmentFastPath(trimmed.AsSpan())) {
+            PathNormalizer.ValidSinglePathSegment(trimmed, "Segment");
+
             var fastPath = left._path.Length > 0 && left._path[^1] == '/'
                     ? left._path + trimmed
                     : left._path + "/" + trimmed;
@@ -567,11 +590,11 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return new(result.Normalized, result.Root);
     }
 
-    // A "simple segment" is one where straight concatenation produces a canonical path:
-    // no directory separators, no `.` / `..` traversal components, no invalid chars.
-    private static bool IsSimpleSegment(ReadOnlySpan<char> segment)
+    // A fast-path segment is one where straight concatenation preserves path structure and doesn't
+    // need the normalizer to resolve separators or traversal components. Value validation still
+    // runs separately so this stays aligned with HostOs.InvalidSegmentChars.
+    private static bool CanUseSingleSegmentFastPath(ReadOnlySpan<char> segment)
     {
-        // Empty / pure-dots rejected: "." and ".." need normalization.
         if (segment.IsEmpty) {
             return false;
         }
@@ -580,19 +603,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             return false;
         }
 
-        foreach (var c in segment) {
-            if (c is '/' or '\\') {
-                return false;
-            }
-
-            // Control chars are invalid in paths on every platform we target.
-            if (c < 0x20) {
-                return false;
-            }
-        }
-
-        // Invalid-char check against the platform's invalid-char set (Windows adds more).
-        return segment.IndexOfAny(SysPath.GetInvalidFileNameChars()) < 0;
+        return segment.IndexOfAny(DirectorySeparators) < 0;
     }
 
     /// <summary>
@@ -653,10 +664,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     ///     It does NOT resolve symlinks, does NOT prevent TOCTOU races, and does NOT handle
     ///     NTFS per-directory case-sensitivity divergence. If the filesystem contains
     ///     attacker-placed symlinks (multi-tenant servers, untrusted archive extraction,
-    ///     attacker-supplied Docker volumes), canonicalize via
-    ///     <see cref="FileInfo.ResolveLinkTarget(bool)" /> with `returnFinalTarget: true` before
-    ///     calling this method, and use atomic file-open APIs with `FileOptions.NoLinkFollow`
-    ///     (.NET 10+) or `O_NOFOLLOW` P/Invoke for race-free access.
+    ///     attacker-supplied Docker volumes), keep this method as the lexical containment
+    ///     check only. Enforce symlink-aware policy in the I/O layer or platform API that
+    ///     actually opens or creates the file.
     ///     </para>
     ///     <para>
     ///     Use <see cref="TryResolveContained" /> in hot paths (ZIP extraction loops, per-request
@@ -746,11 +756,10 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     // (normalizes-above rejection). Both public methods delegate here to keep the two
     // behaviors symmetric. See .planning/phases/02-hierarchy-security-scope/02-CONTEXT.md
     // for the decision rationale; the lexical-only scope (no symlink canonicalization) is
-    // an explicit project-level out-of-scope per PROJECT.md "Symlink-aware operations --
-    // consumers canonicalize via FileInfo.ResolveLinkTarget". In-library canonicalization
+    // an explicit project-level out-of-scope per PROJECT.md. In-library canonicalization
     // would mean blocking I/O, TOCTOU-unsafe behavior, and an async-required API. Consumers
-    // in adversarial-filesystem threat models drop to platform P/Invoke (openat +
-    // O_NOFOLLOW on Unix) or .NET 10's FileOptions.NoLinkFollow.
+    // in adversarial-filesystem threat models enforce symlink policy in the I/O layer via
+    // platform APIs (for example, openat-style flows on Unix or CreateFileW on Windows).
     private bool TryResolveContainedCore(
         string segment,
         out MPath? result,
@@ -814,11 +823,12 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     // overload -- pure string math, no filesystem I/O.
     //
     // It does NOT canonicalize symlinks, and deliberately so. The temptation to "upgrade"
-    // ResolveContained to call FileInfo.ResolveLinkTarget before the containment check keeps
-    // coming up; resist it. Reasons, in order of how they'll bite you:
+    // ResolveContained into a symlink-aware pre-check keeps coming up; resist it. Reasons,
+    // in order of how they'll bite you:
     //
-    //   1. Blocking I/O in a sync API. FileInfo.ResolveLinkTarget hits the filesystem. On a
-    //      stale NFS or SMB mount this blocks for minutes. MPath.ResolveContained is
+    //   1. Blocking I/O in a sync API. Any symlink-canonicalization pre-check hits the
+    //      filesystem. On a stale NFS or SMB mount this blocks for minutes.
+    //      MPath.ResolveContained is
     //      documented as pure and [Pure]-attributed, callable from async hot paths
     //      (per-request filename sanitization, ZIP extraction loops). Adding blocking I/O
     //      is a breaking change even if the signature stays identical.
@@ -826,12 +836,11 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     //      a symlink between the check here and the caller's actual File.Open call.
     //      Canonicalizing inside the library gives the caller a false sense of security --
     //      worse than no canonicalization at all, because the docs then have to walk it back.
-    //   3. Race-free containment requires OS-specific P/Invoke: `openat` + `O_NOFOLLOW` on
+    //   3. Race-free containment requires OS-specific I/O APIs: `openat` + no-follow flags on
     //      Unix, `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT` on Windows. That is
-    //      explicitly out of scope per .planning/PROJECT.md "Symlink-aware operations --
-    //      consumers canonicalize via FileInfo.ResolveLinkTarget." A future Michi.FileSystem
-    //      package may offer ResolveContainedCanonical once the async / cancellation-token
-    //      story is worked out in the core library.
+    //      explicitly out of scope for this lexical core type. A future Michi.FileSystem
+    //      package may offer symlink-aware helpers once the async / cancellation-token story
+    //      is worked out in the core library.
     //
     // What consumers with adversarial-filesystem threat models should do is documented in
     // the XML remarks on ResolveContained and in the README Security section. Do not expand
@@ -874,28 +883,28 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 
     /// <summary>
     /// Returns a new <see cref="MPath" /> with the final segment replaced by <paramref name="name" />.
-    /// The name must not contain directory separators.
+    /// The replacement must be a valid single path segment: non-empty, no directory separators,
+    /// not `.` or `..`, free of platform-invalid segment characters, and on Windows not a
+    /// reserved device name or a segment ending in `.` / space.
     /// </summary>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="name" /> is null.
     /// </exception>
     /// <exception cref="InvalidPathException">
-    /// <paramref name="name" /> is empty, contains a separator, or this path is a root.
+    /// <paramref name="name" /> is empty, contains a directory separator, is `.` or `..`,
+    /// contains platform-invalid segment characters, is a Windows-reserved device name,
+    /// ends with `.` / space on Windows, or this path is a root.
     /// </exception>
     public MPath WithName(string name)
     {
         Guard.NotNull(name, "Name cannot be null. Pass a non-empty segment string.");
 
+        // Exception wording is public API; preserve the pre-Task-2 empty-name message.
         if (name.Length == 0) {
             throw new InvalidPathException(name, "Name is empty. Pass a non-empty segment string");
         }
 
-        if (name.IndexOfAny(DirectorySeparators) >= 0) {
-            throw new InvalidPathException(
-                name,
-                $"Name '{name}' contains a directory separator. Use the / operator or Join() to compose multi-segment paths."
-            );
-        }
+        PathNormalizer.ValidSinglePathSegment(name, "Name");
 
         if (_path == Root) {
             throw new InvalidPathException(
@@ -914,10 +923,15 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 
     /// <summary>
     /// Returns a new <see cref="MPath" /> with the file extension replaced. Leading dot is optional;
-    /// null or empty string removes the extension.
+    /// null or empty string removes the extension. After combination with the current file name,
+    /// the resulting segment must still satisfy the same single-segment invariants as
+    /// <see cref="WithName(string)" />.
     /// </summary>
     /// <exception cref="InvalidPathException">
-    /// <paramref name="extension" /> is a bare ".".
+    /// <paramref name="extension" /> is a bare "."; contains a directory separator; or,
+    /// after combination with the current file name, produces an invalid single segment
+    /// (for example `.` / `..`, a platform-invalid character, a Windows-reserved device name,
+    /// trailing `.` / space on Windows, or any invalid name on a root path).
     /// </exception>
     public MPath WithExtension(string? extension)
     {
