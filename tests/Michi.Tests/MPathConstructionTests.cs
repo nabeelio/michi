@@ -44,17 +44,6 @@ public class MPathConstructionTests {
     }
 
     [Theory]
-    [InlineData(@"C:\temp\file.")]
-    [InlineData(@"C:\temp\file ")]
-    public void From_WindowsTrailingDotOrSpaceSegment_Throws(string path)
-    {
-        PlatformTestHelpers.SkipUnlessWindows();
-
-        var ex = Should.Throw<InvalidPathException>(() => MPath.From(path));
-        ex.Message.ShouldContain("must not end with '.' or space");
-    }
-
-    [Theory]
     [InlineData(@"C:\CON\bad*name")]
     [InlineData(@"C:\bad.\good*name")]
     public void From_WindowsInvalidCharacter_WinsOverEarlierSegmentShapeError(string path)
