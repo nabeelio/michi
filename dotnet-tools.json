@@ -2,10 +2,24 @@
   "version": 1,
   "isRoot": true,
   "tools": {
+    "cyclonedx": {
+      "version": "6.1.1",
+      "commands": [
+        "dotnet-CycloneDX"
+      ],
+      "rollForward": false
+    },
     "jetbrains.resharper.globaltools": {
       "version": "2026.1.0.1",
       "commands": [
         "jb"
+      ],
+      "rollForward": false
+    },
+    "sign": {
+      "version": "0.9.1-beta.26179.1",
+      "commands": [
+        "sign"
       ],
       "rollForward": false
     }

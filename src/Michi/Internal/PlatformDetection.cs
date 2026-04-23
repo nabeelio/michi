@@ -43,12 +43,8 @@ internal static class HostOs {
 
     /// <summary>
     /// Characters that are invalid inside a path segment on Windows (NTFS / FAT32 / exFAT). Per
-    /// <see href="https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file">
-    /// Microsoft: Naming a File or Directory
-    /// </see>
-    /// ,
-    /// the filename namespace rejects `&lt; &gt; : " | ? *` plus control characters
-    /// `\0` through `\x1F`.
+    /// https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+    /// https://stackoverflow.com/a/31976060
     /// Separators (`/` and `\`) are deliberately excluded -- segment validation runs
     /// AFTER splitting on separators, so a separator cannot appear within a segment by construction.
     /// </summary>
@@ -98,15 +94,8 @@ internal static class HostOs {
     ];
 
     /// <summary>
-    /// Characters that are invalid inside a path segment on macOS. POSIX kernel semantics forbid
-    /// only `\0`, but the Mac ecosystem (Finder, Carbon, AppleScript, NSURL) translates
-    /// `:` to `/` in user-visible names because HFS+ used `:` as the path separator. Accepting
-    /// `:` would mean `MPath.From` paths that Finder displays with a different name -- violates
-    /// the "always-valid" contract. POSIX §3.170:
-    /// <see href="https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap03.html">
-    /// IEEE Std 1003.1-2017 §3.170 Filename
-    /// </see>
-    /// .
+    /// Characters that are invalid inside a path segment on macOS
+    /// https://ss64.com/mac/syntax-filenames.html
     /// </summary>
     internal static readonly char[] InvalidMacOsSegmentChars = [
         '\0',
@@ -116,8 +105,8 @@ internal static class HostOs {
     /// <summary>
     /// Characters that are invalid inside a path segment on Linux. POSIX §3.170 forbids only
     /// `\0` (and `/`, handled as the separator). ext4, btrfs, xfs all inherit this minimal rule.
-    /// Characters like `&lt;`, `&gt;`, `:`, `*`, `?` are perfectly legal filename characters on
-    /// Linux; rejecting them would be over-validation.
+    /// Characters like `&lt;`, `&gt;`, `:`, `*`, `?` are perfectly legal filename characters :o
+    /// https://stackoverflow.com/a/31976060
     /// </summary>
     internal static readonly char[] InvalidLinuxSegmentChars = ['\0'];
 
@@ -128,11 +117,9 @@ internal static class HostOs {
     /// <see cref="IsMacOS" /> / <see cref="IsLinux" />.
     /// </summary>
     /// <remarks>
-    /// Authoritative, hand-authored, cited -- <strong>not</strong> derived from
+    /// Hand-authored, for better or worse -- cited -- not derived from
     /// <see cref="Path.GetInvalidFileNameChars" /> which Microsoft's docs explicitly disclaim as
-    /// non-authoritative ("The array returned from this method is not guaranteed to contain the
-    /// complete set of characters that are invalid in file and directory names."). See the
-    /// per-platform fields above for source citations.
+    /// non-authoritative
     /// </remarks>
     public static readonly char[] InvalidSegmentChars =
             IsWindows ? InvalidWindowsSegmentChars

@@ -21,6 +21,10 @@
     <PackageVersion Include="MinVer" Version="6.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.203" />
+  </ItemGroup>
+
   <!-- Library runtime dependencies for older TFMs. System.Text.Json and
        System.Collections.Immutable are in-box on net6+ but ship as packages for
        netstandard2.1. Referenced conditionally in src/Michi/Michi.csproj. -->

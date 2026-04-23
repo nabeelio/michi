@@ -1,4 +1,4 @@
-<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
 	<!-- Public API members (exception properties, init-only setters on public records) are
 	     consumed by library users, not by this solution's own code. ReSharper's
 	     "Global" variants flag these as unused; that's a false positive for library projects. -->
@@ -15,16 +15,5 @@
 	     suggests `protected` because nothing inside Michi instantiates the base class, but that
 	     would be a SemVer break. -->
 	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MemberCanBeProtected_002EGlobal/@EntryIndexedValue">DO_NOT_SHOW</s:String>
-	<!-- IsLinux (HostOs), IsMacOS/SkipUnless* (PlatformTestHelpers) kept for readability and
-	     sibling symmetry. IsExternalInit is a compiler-required polyfill -- existence IS the API. -->
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedMember_002EGlobal/@EntryIndexedValue">DO_NOT_SHOW</s:String>
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedType_002EGlobal/@EntryIndexedValue">DO_NOT_SHOW</s:String>
-	<!-- Primary constructors: ReSharper prefers them, but for types where the body does meaningful
-	     validation or the ctor reads clearly as a unit (PathNormalizer result struct,
-	     MPathComparer.Impl), the classic form is more diff-friendly and debugger-friendly. -->
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConvertToPrimaryConstructor/@EntryIndexedValue">DO_NOT_SHOW</s:String>
-	<!-- MergeIntoPattern keeps suggesting deeper pattern nesting. The form cleanupcode normalizes
-	     to is already the cleanest reading; further collapse hurts readability. -->
-	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MergeIntoPattern/@EntryIndexedValue">DO_NOT_SHOW</s:String>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=Michi/@EntryIndexedValue">True</s:Boolean>
-</wpf:ResourceDictionary>
+	</wpf:ResourceDictionary>

@@ -1,25 +1,27 @@
-[![Michi NuGet Package](https://img.shields.io/nuget/v/Michi.svg)](https://www.nuget.org/packages/Michi/) [![Michi NuGet Package Downloads](https://img.shields.io/nuget/dt/Michi)](https://www.nuget.org/packages/Michi) [![GitHub Actions Status](https://github.com/nabeelio/Michi/workflows/Build/badge.svg?branch=main)](https://github.com/nabeelio/Michi/actions)
+[![Michi NuGet Package](https://img.shields.io/nuget/v/Michi.svg)](https://www.nuget.org/packages/Michi/) [![Michi NuGet Package Downloads](https://img.shields.io/nuget/dt/Michi)](https://www.nuget.org/packages/Michi) [![GitHub Actions Status](https://github.com/nabeelio/Michi/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nabeelio/Michi/actions/workflows/ci.yml)
 
 # Michi
-
-Stop passing raw strings around for filesystem paths. `MPath` is a strongly-typed, immutable, 
-absolute path that normalizes at construction and works on Windows, macOS, and Linux. After not
-finding anything on nuget, I created and have used this library as part of a larger project for 
-years, I'm now extracting it into a full-fledged library
 
 Michi (ミチ) means path in Japanese. The core type is `MPath`:
 
 - **M**odern Path
 - **M**anaged Path
 - **M**ichi Path
-- 
+
+Stop passing raw strings around for filesystem paths. `MPath` is a strongly-typed, immutable,
+absolute path that normalizes at construction and behaves consistently across Windows, macOS, and
+Linux.
+
+After not finding anything on NuGet, I pulled `MPath` out of a larger project where I had been 
+developing it and had use for years in production, gave it a name, and it became Michi :)
+
 ## Install
 
-```
+```bash
 dotnet add package Michi
 ```
 
-Targets `netstandard2.1`, `net8.0`, `net10.0`.
+Targets `netstandard2.1`, `net8.0`, `net10.0`, and works across Windows, macOS and Linux
 
 ## The Basics
 
@@ -38,11 +40,12 @@ var md = file.WithExtension("md");            // /var/log/myapp/2026-04-20.md
 ## Construction
 
 ```csharp
-MPath.From("/var/log");                       // absolute Unix
-MPath.From(@"C:\Logs\app");                   // absolute Windows
+MPath.From("/var/log");                       // Unix absolute path
+MPath.From(@"C:\Logs\app");                   // Windows-only absolute path
 MPath.From("logs/today.log", "/var");         // relative + explicit base
-MPath.TryFrom("maybe-a-path?", out var p);    // non-throwing
-MPath.Format("/home/{0}/docs", "alice");      // template + args
+string? maybePath = null;
+MPath.TryFrom(maybePath, out var p);           // false, non-throwing
+MPath.Format("{0}/{1}", MPath.Home.ToUnixString(), "docs");
 ```
 
 Relative paths without a base resolve against `AppContext.BaseDirectory`. That's deliberate. 
@@ -55,94 +58,39 @@ Null input to `From` throws `ArgumentNullException`. Empty string throws `Invali
 ## Joining
 
 ```csharp
+// use the short hand
 var config = MPath.Home / ".config" / "myapp" / "settings.json";
 
 // multiple segments at once
-var log = base.Join("logs", "2026", "04", "today.log");
+var installRoot = MPath.InstalledDirectory;
+var log = installRoot.Join("logs", "2026", "04", "today.log");
+var cache = MPath.LocalApplicationData / "myapp" / "cache";
 ```
 
-The right side is always treated as relative. Leading `/` or `\` gets stripped, so `base / "/etc"`
-gives you `{base}/etc`, not `/etc`. If you want to escape the base, use `..` explicitly.
+The right side is always treated as relative. Leading `/` or `\` gets stripped, so
+`installRoot / "/etc"` gives you `{installRoot}/etc`, not `/etc`. If you want to escape the base,
+use `..` explicitly.
 
-This is also how you can chain (yeah...contrived...):
-
-```csharp
-
-public class AppPaths 
-{
-    private static string _appName = "myapp";
-    ...
-    public static MPath BaseDirectory { get; set }
-    public static AbsolutePath CacheDirectory { get; set; } = null!;
-    public static AbsolutePath BlobCacheDirectory { get; set; } = null!;
-    
-    public void Configure(MPath installedDirectory) {
-        BaseDirectory = installedDirectory;
-        CacheDirectory = BaseDirectory / "cache";
-        BlobCacheDirectory = BaseDirectory / Cache / "blobcache"
-        
-        // This will create the directory if it doesn't exist, clean it out if it does
-        CacheDirectory.Create(clean: true)
-        
-        // Create the this directory, don't exist because the above is missing
-        BlobCacheDirectory.Create()
-    }
-}
-```
-
-
-## Usage in an `AppPaths` container
-
-This is another pattern I use it:
+One reasonable way to wrap application-specific roots is to build your own container type:
 
 ```csharp
-// Wrap your own app-wide defaults if you need them:
-public static class AppPaths
+public sealed class AppPaths
 {
-    public required MPath Data { get; init; }
-    public required MPath Logs { get; init; }
-    public required MPath Cache { get; init; }
-
-    public static AppPaths Default { get; } = Build(MPath.From(AppContext.BaseDirectory, Options));
-
-    public static AppPaths Build(MPath root) => new()
+    public AppPaths(MPath root)
     {
-        Data  = root / "data",
-        Logs  = root / "logs",
-        Cache = root / "cache",
-    };
-}
-```
-
-You can also use `MPathScoped` (though this example is a bit contrived). In my app, I set different
-paths for some roots, depending on if the application was installed through an installer, or from
-a ZIP file and sitting in a random directory.
-
-```csharp
-public static class AppPaths
-{
-    public MPath Data { get; set; }
-    public MPath Logs { get; set; }
-    public MPath Cache { get; set; }
-    
-    // Dynamically get a path
-    public MPath UserDatabase(string userName) => Cache.Format($"{userName}/data.sqlite")
-
-    public static AppPaths Default { get; } = Build(MPath.From(AppContext.BaseDirectory, Options));
-
-    public static AppPaths Build(MPath root) {
-    {
-        var scoped = new MPathScoped(MPath.LocalApplicationData / "myapp");
-        
-        return new AppPaths() {
-            Data  = root / "data",
-            Logs  = root / "logs",
-        
-            // We want to place the cache in %LocalAppData%/myappname/cache
-            Cache = scoped / "cache"
-        };
+        Data = root / "data";
+        Logs = root / "logs";
+        Cache = MPath.LocalApplicationData / "myapp" / "cache";
     }
+
+    public MPath Data { get; }
+    public MPath Logs { get; }
+    public MPath Cache { get; }
+
+    public MPath UserDatabase(string userName) => Cache / userName / "data.sqlite";
 }
+
+var paths = new AppPaths(MPath.InstalledDirectory);
 ```
 
 ## Normalization
@@ -150,8 +98,8 @@ public static class AppPaths
 Every `MPath` goes through the same pipeline:
 
 ```csharp
-MPath.From("/foo/../bar//baz/").ToString();   // "/bar/baz"
-MPath.From("/foo\\bar").ToUnixString();       // "/foo/bar"  (backslash -> forward)
+MPath.From("/foo/../bar//baz/").ToUnixString();     // "/bar/baz" on Unix
+MPath.From(@"C:\foo\..\bar\\baz\").ToUnixString(); // Windows-only input -> "C:/bar/baz"
 ```
 
 `..` resolves up, `.` drops out, repeated separators collapse, trailing slashes get stripped, 
@@ -167,8 +115,8 @@ a.Equals(b);                                   // true on Windows/macOS, false o
 a.GetHashCode() == b.GetHashCode();            // same -- consistent with Equals
 ```
 
-Hash and equality derive from one source (`HostOs.PathComparer`), so they can't drift apart. 
-If two paths are equal, their hashes match. Always.
+Hashing and equality use the same host-OS comparison rules, so they can't drift apart. If two
+paths are equal, their hashes match.
 
 Need explicit behavior regardless of host?
 
@@ -180,6 +128,7 @@ var lookup = new Dictionary<MPath, int>(MPathComparer.OrdinalIgnoreCase); // alw
 ## String output
 
 ```csharp
+// Windows-only example
 var p = MPath.From(@"C:\Users\alice");
 
 p.ToString();         // "C:\Users\alice"   -- OS-native separators (Windows here)
@@ -220,42 +169,29 @@ file.WithExtension(null);    // /a/b/c         -- removes extension
 file.WithoutExtension();     // /a/b/c
 ```
 
-`WithName` rejects anything with a separator in it. If you want to change the name AND the directory
-
-```csharp
-file.Parent / "newdir" / "newname.ext"
-```
+`WithName` accepts exactly one valid path segment: non-empty, no separators, not `.` or `..`, and still valid for the current platform (for example Windows also rejects reserved device names and trailing `.` or space). If you want to change the name AND the directory, that's `file.Parent / "newdir" / "newname"`.
 
 ## Well-known paths
 
-A bunch of well-known paths/commonly used are included
+Common roots are built in:
 
 ```csharp
-MPath.Home;              // user profile -- cached singleton
-MPath.Temp;              // system temp -- cached singleton
-MPath.InstallDirectory   // where the exe is installed to
-MPath.CurrentDirectory;  // evaluated on every access, NOT cached
+var install = MPath.InstalledDirectory;                 // AppContext.BaseDirectory
+var config = MPath.ApplicationData / "myapp" / "config.json";
+var cache = MPath.LocalApplicationData / "myapp" / "cache";
+var tempFile = MPath.Temp / "myapp" / "import.tmp";
+var cwd = MPath.CurrentDirectory;                       // evaluated on every access
 ```
 
-`Home` and `Temp` are stable for the process lifetime so they're lazy singletons. `CurrentDirectory` 
-never caches because `Directory.SetCurrentDirectory` exists and could silently break you.
+`Home`, `Temp`, `InstalledDirectory`, `ApplicationData`, `LocalApplicationData`, and
+`CommonApplicationData` are lazy singletons. `CurrentDirectory` never caches because
+`Directory.SetCurrentDirectory` exists and would silently break you.
 
 There's also:
 
-- **`MPath.ApplicationData`**
-  - Windows: `%APPDATA%`, e.g. `C:\Users\{user}\AppData\Roaming`
-  - macOS: `~/Library/Application Support`
-  - Linux: `$XDG_CONFIG_HOME`, else `~/.config`
-- **`MPath.LocalApplicationData`**
-  - Windows:`%LOCALAPPDATA%` (e.g. `C:\Users\{user}\AppData\Local`)
-  - macOS: `~/Library/Application Support`
-  - Linux: `$XDG_DATA_HOME`, else `~/.local/share`
-- **`MPath.CommonApplicationData**`
-  - Windows: `%ProgramData%` (e.g. `C:\ProgramData`)
-  - MacOS: `/usr/share`
-  - Linux: `/usr/share`
-
-**NOTE** The above directory, you should create a new directory with your app name in them
+- `MPath.Home`: current user's profile directory
+- `MPath.CommonApplicationData`: machine-wide shared app data (`%ProgramData%` on Windows,
+  `/usr/share` on macOS/Linux)
 
 ## Tilde and env vars
 
@@ -263,7 +199,7 @@ Off by default. Opt in per-call:
 
 ```csharp
 var opts = MPathOptions.Default with { ExpandTilde = true };
-var config = MPath.From("~/.config/app", opts);   // expands to /home/alice/.config/app
+var config = MPath.From("~/.config/app", opts);   // expands under the current user's home directory
 
 var opts2 = MPathOptions.Default with { ExpandEnvironmentVariables = true };
 var data = MPath.From("$HOME/data", opts2);       // Unix: $VAR, ${VAR}
@@ -278,33 +214,18 @@ Unix env-var expansion throws `InvalidPathException` on undefined variables. Win
 `MPathOptions.Default` is read-only. No mutable global state.
 
 ```csharp
-// Wrap your own app-wide defaults if you need them:
-public static class AppPaths
+var opts = MPathOptions.Default with
 {
-    public static MPathOptions Options { get; } = MPathOptions.Default with
-    {
-        BaseDirectory = "/opt/myapp",
-        ExpandTilde = true,
-    };
-    
-    public required MPath Data { get; init; }
-    public required MPath Logs { get; init; }
-    public required MPath Cache { get; init; }
+    BaseDirectory = MPath.InstalledDirectory.Path,
+    ExpandTilde = true,
+};
 
-    public static AppPaths Default { get; } = Build(MPath.From(AppContext.BaseDirectory, Options));
-
-    public static AppPaths Build(MPath root) => new()
-    {
-        Data  = root / "data",
-        Logs  = root / "logs",
-        Cache = root / "cache",
-    };
-}
-
-var file = MPath.From("data/settings.json", AppPaths.Options);
+var file = MPath.From("data/settings.json", opts);
+var homeConfig = MPath.From("~/.config/myapp/settings.json", opts);
 ```
 
-The record's `with` expression is the easiest way to override.
+The record's `with` expression is the ergonomic way to override per-call or wrap a static accessor 
+for process-wide defaults.
 
 ## Serialization
 
@@ -312,14 +233,21 @@ Built-in. The `[JsonConverter]` and `[TypeConverter]` attributes on `MPath` wire
 No registration required.
 
 ```csharp
-// System.Text.Json
-var json = JsonSerializer.Serialize(MPath.From("/a/b"));  // "\"/a/b\""
-var back = JsonSerializer.Deserialize<MPath>(json);        // round-trips
+using System.Text.Json;
+using Michi;
+
+// System.Text.Json (Windows host example; on Unix use "/work/logs/today.log")
+var original = MPath.From(@"C:\work\logs\today.log");
+var json = JsonSerializer.Serialize(original);             // "\"C:/work/logs/today.log\""
+var back = JsonSerializer.Deserialize<MPath>(json);        // same-host round-trip
 
 // IConfiguration, ASP.NET model binding, WPF PropertyGrid -- all work via TypeConverter
 ```
 
-Round-trip uses the forward-slash form, so a Windows-serialized path reads correctly on Linux.
+JSON always writes the canonical forward-slash form, so payloads are deterministic across hosts.
+Deserialization still uses the current OS rules. A foreign-root payload such as
+`C:/work/logs/today.log` can succeed or fail depending on the host, so it is not a supported
+cross-OS portability mechanism.
 
 **COMING** An `MPathRelative` that can also be used for serializing, and it has to joined
 with an `MPath`, so your config files (if you save them back) don't all turn into absolute paths
@@ -329,65 +257,83 @@ with an `MPath`, so your config files (if you save them back) don't all turn int
 ### Untrusted input
 
 When a path segment comes from outside your process -- a ZIP archive entry, an HTTP request, a
-config value, an environment variable -- you might need containment, not just normalization. 
-`MPath.Format` and the `/` operator happily normalize `../` segments, which means user input can 
-escape the intended base directory (CWE-22 / ZIP-slip). 
-
-`ResolveContained` is the opposite: it normalizes AND verifies the result stays under the base.
+config value, an environment variable -- you need containment, not just normalization. `MPath.Format`
+and the `/` operator happily normalize `../` segments, which means user input can escape the intended
+base directory (CWE-22 / ZIP-slip). `ResolveContained` is the opposite: it normalizes AND verifies
+the result stays under the base.
 
 ```csharp
 var uploads = MPath.From("/var/www/uploads");
 
-// Don't do this -- user input can traverse. Normalization happily resolves `../`.
-// if httpFilename = "../../etc/passwd", target = "/etc/passwd" with no warning.
+// ❌ DANGEROUS -- user input can traverse. Normalization happily resolves `../`.
 var target = MPath.Format("/var/www/uploads/{0}", httpFilename);
+// if httpFilename = "../../etc/passwd", target = "/var/etc/passwd" with no warning.
 
-// SAFE -- escape attempts throw.
-var target = uploads.ResolveContained(httpFilename);
+// ✅ SAFE -- escape attempts throw.
+var safeTarget = uploads.ResolveContained(httpFilename);
 // throws InvalidPathException when httpFilename escapes the uploads directory.
 
-// SAFE, non-throwing -- useful in per-request or per-archive-entry hot paths.
-if (uploads.TryResolveContained(httpFilename, out var safe)) {
+// ✅ SAFE, non-throwing for invalid non-null fragments -- useful in per-request or per-archive-entry hot paths.
+if (uploads.TryResolveContained(httpFilename, out var safe))
+{
     File.WriteAllBytes(safe.Path, bytes);
 }
-else {
-    return Results.BadRequest("naughty! bad filename!");
+else
+{
+    return Results.BadRequest("filename must stay under the uploads directory");
 }
 ```
 
 ### What `ResolveContained` does and doesn't
 
-**Does**
-
-- Rejects lexical escape -- `../../etc/passwd`, `subdir/../../escape`, and every `..`-traversal
+✅ Rejects lexical escape -- `../../etc/passwd`, `subdir/../../escape`, and every `..`-traversal
 variant throws `InvalidPathException`.
-- Rejects sibling-directory false positives -- `/var/www-evil` is NOT contained in `/var/www`, even
+✅ Rejects sibling-directory false positives -- `/var/www-evil` is NOT contained in `/var/www`, even
 though one is a string prefix of the other. The guard is a segment boundary, not a `StartsWith`.
-- Strips leading separators -- `base.ResolveContained("/etc/passwd")` joins to `base/etc/passwd`,
+✅ Strips leading separators -- `base.ResolveContained("/etc/passwd")` joins to `base/etc/passwd`,
 never to `/etc/passwd`. User input can't accidentally escape by starting with `/`.
+✅ Is pure string/path processing -- no filesystem I/O, and `TryResolveContained` gives you a
+non-throwing API surface for invalid non-null fragments in per-request sanitization loops. Null
+input still throws `ArgumentNullException`.
 
-**Does Not**
-
-- Resolve symlinks -- if the filesystem contains attacker-placed symlinks (multi-tenant
+❌ Does NOT resolve symlinks -- if the filesystem contains attacker-placed symlinks (multi-tenant
 servers, user-supplied archive extraction, containers mounting untrusted volumes), a "contained"
 `MPath` can still read or write a target outside the base. That is CWE-59 territory and needs
 filesystem-layer mitigation, not path math.
-- Validate against case-sensitivity mismatches -- NTFS directories with per-directory
+❌ Does NOT prevent TOCTOU races -- even after a pre-check, an attacker can swap the path for
+a symlink between your check and your I/O call.
+❌ Does NOT validate against case-sensitivity mismatches -- NTFS directories with per-directory
 case-sensitivity flags (Windows Subsystem for Linux interop) are not inspected; `ResolveContained`
 uses the host-OS default.
+
+### Adversarial filesystems
+
+If your threat model includes attacker-placed symlinks on the filesystem you're reading from
+(multi-tenant file servers, user-uploaded archive extraction, containers mounting untrusted
+volumes), `ResolveContained` is not sufficient on its own. The mitigations live at the I/O layer,
+not in path math:
+
+- **Keep `ResolveContained` lexical-only:** use it to reject `..` traversal and sibling-prefix
+  escapes before you touch the filesystem.
+- **Enforce symlink policy where the open/create happens:** use the I/O layer or platform API that
+  actually opens the file to decide whether symlinks are allowed.
+- **Race-free sandboxing is OS-specific:** on Unix, that usually means `openat`-style flows with
+  no-follow semantics; on Windows, `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT` or related
+  handle-based APIs. Michi does not wrap these because the correct abstraction depends on your host
+  setup.
 
 ## What it doesn't do
 
 - No implicit `string` to `MPath` or `MPath` to `string` conversions. Use `MPath.From(s)` to construct and `p.Path` (or `p.ToString()`) to extract the string. Implicit conversions make it too easy to lose the type and start mixing raw strings back into your code.
 - No filesystem I/O in this package. `MPath` is pure-string. Use `File.*` or `Directory.*` with `mpath.Path` (or `mpath.ToString()`) for that.
-- No symbolic link resolution. Use `FileInfo.ResolveLinkTarget` if you need it.
+- No symbolic link resolution. Symlink-aware enforcement belongs in the I/O layer or platform APIs,
+  not in `MPath`.
 - Construction is strict. Empty paths, null chars, and unresolvable relatives throw. Catch `InvalidPathException` or use `TryFrom`.
 
 ## License
 
 MIT.
 
-
 ## Inspiration
 
-This library was inspired by the `Nuke.AbsolutePath` library!
+This library was inspired by the `Nuke.AbsolutePath` library.
