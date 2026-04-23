@@ -303,17 +303,6 @@ If your threat model includes attacker-placed symlinks on the filesystem you're 
   On Windows it's `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT` or similar handle-based APIs. 
   Michi doesn't wrap these because the right abstraction depends on your host setup
 
-## What it doesn't do
-
-- No implicit string conversions in either direction. Use `MPath.From(s)` to construct and 
-  `p.Path` (or `p.ToString()`) to extract. Implicit conversions make it too easy to lose the 
-  type and start mixing raw strings back in
-- No filesystem I/O. `MPath` is pure-string. Use `File.*` or `Directory.*` with `mpath.Path` 
-  for that
-- No symlink resolution. That belongs at the I/O layer, not in path math
-- Construction is strict. Empty paths, null chars, unresolvable relatives all throw. 
-  Catch `InvalidPathException` or use `TryFrom`
-
 ## License
 
 MIT.
