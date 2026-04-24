@@ -47,4 +47,11 @@
     <Folder Include="Extensions\" />
   </ItemGroup>
 
+  <!-- Expose internal validators/helpers to the test project so unit tests can cover
+       internals (e.g. ExistsPolicyValidator) without forcing them into the public surface.
+       Only the test assembly gets this access; library consumers do not. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Michi.Tests" />
+  </ItemGroup>
+
 </Project>

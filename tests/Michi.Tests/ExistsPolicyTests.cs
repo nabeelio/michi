@@ -25,7 +25,7 @@ public class ExistsPolicyTests {
     [MemberData(nameof(NamedCombinations))]
     public void Named_combinations_validate(ExistsPolicy policy)
     {
-        Should.NotThrow(() => ExistsPolicyValidator.Validate(policy, "policy"));
+        Should.NotThrow(() => ExistsPolicyValidator.Validate(policy, nameof(policy)));
     }
 
     // Two file behaviors in the same policy is a user error -- the message must name both.
