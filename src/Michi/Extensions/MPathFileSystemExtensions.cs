@@ -194,4 +194,118 @@ public static class MPathFileSystemExtensions {
     }
 
 #endregion
+
+#region Enumeration
+
+    /// <summary>
+    /// Lazily enumerates files under this path that match `searchPattern`. Iteration is
+    /// streaming -- the underlying filesystem is only walked as elements are consumed.
+    /// </summary>
+    /// <param name="path">The directory to enumerate. Must exist and must be a directory.</param>
+    /// <param name="searchPattern">
+    /// Glob-style pattern passed to <see cref="Directory.EnumerateFiles(string, string, SearchOption)" />.
+    /// </param>
+    /// <param name="searchOption">Top-level only or recursive.</param>
+    /// <returns>
+    /// An <see cref="IEnumerable{T}" /> of <see cref="MPath" /> yielded lazily; ordering is
+    /// filesystem-dependent and not guaranteed.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// `path` or `searchPattern` is null. Thrown eagerly at call time, not deferred to
+    /// iteration.
+    /// </exception>
+    /// <exception cref="DirectoryNotFoundException">
+    /// `path` does not exist. Thrown by the underlying BCL enumeration on first
+    /// `MoveNext` -- consumers that never iterate will not see it.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// `searchPattern` is invalid or `path` points at a file, not a directory. Thrown by
+    /// the underlying BCL enumeration on first `MoveNext`.
+    /// </exception>
+    /// <remarks>
+    /// Materialize with `ToList()` / `ToArray()` when a snapshot is needed. Without
+    /// materialization, two iterations of the same query walk the filesystem twice and
+    /// may return different results if the tree changed in between.
+    /// </remarks>
+    public static IEnumerable<MPath> EnumerateFiles(
+        this MPath path,
+        string searchPattern,
+        SearchOption searchOption
+    )
+    {
+        // Eager checks run before the iterator is returned. If the `foreach` lived in this
+        // method body directly (with `yield return`), argument validation would be deferred
+        // until the caller called `MoveNext` -- silently letting null receivers pass if the
+        // query was built but never iterated.
+        Guard.NotNull(path);
+        Guard.NotNull(searchPattern);
+
+        return EnumerateFilesIterator(path, searchPattern, searchOption);
+    }
+
+    private static IEnumerable<MPath> EnumerateFilesIterator(
+        MPath path,
+        string searchPattern,
+        SearchOption searchOption
+    )
+    {
+        foreach (var raw in Directory.EnumerateFiles(path.Value, searchPattern, searchOption)) {
+            yield return MPath.From(raw);
+        }
+    }
+
+    /// <summary>
+    /// Lazily enumerates directories under this path that match `searchPattern`. Iteration
+    /// is streaming -- the underlying filesystem is only walked as elements are consumed.
+    /// </summary>
+    /// <param name="path">The directory to enumerate. Must exist and must be a directory.</param>
+    /// <param name="searchPattern">
+    /// Glob-style pattern passed to
+    /// <see cref="Directory.EnumerateDirectories(string, string, SearchOption)" />.
+    /// </param>
+    /// <param name="searchOption">Top-level only or recursive.</param>
+    /// <returns>
+    /// An <see cref="IEnumerable{T}" /> of <see cref="MPath" /> yielded lazily; ordering is
+    /// filesystem-dependent and not guaranteed.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// `path` or `searchPattern` is null. Thrown eagerly at call time, not deferred to
+    /// iteration.
+    /// </exception>
+    /// <exception cref="DirectoryNotFoundException">
+    /// `path` does not exist. Thrown by the underlying BCL enumeration on first
+    /// `MoveNext`.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// `searchPattern` is invalid or `path` points at a file, not a directory. Thrown by
+    /// the underlying BCL enumeration on first `MoveNext`.
+    /// </exception>
+    public static IEnumerable<MPath> EnumerateDirectories(
+        this MPath path,
+        string searchPattern,
+        SearchOption searchOption
+    )
+    {
+        Guard.NotNull(path);
+        Guard.NotNull(searchPattern);
+
+        return EnumerateDirectoriesIterator(path, searchPattern, searchOption);
+    }
+
+    private static IEnumerable<MPath> EnumerateDirectoriesIterator(
+        MPath path,
+        string searchPattern,
+        SearchOption searchOption
+    )
+    {
+        foreach (var raw in Directory.EnumerateDirectories(
+                     path.Value,
+                     searchPattern,
+                     searchOption
+                 )) {
+            yield return MPath.From(raw);
+        }
+    }
+
+#endregion
 }
