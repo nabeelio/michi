@@ -5,6 +5,13 @@ using Xunit;
 namespace Michi.Tests;
 
 public class ExistsPolicyTests {
+    public static TheoryData<ExistsPolicy> NamedCombinations => [
+        ExistsPolicy.Fail,
+        ExistsPolicy.MergeAndSkip,
+        ExistsPolicy.MergeAndOverwrite,
+        ExistsPolicy.MergeAndOverwriteIfNewer,
+    ];
+
     // `Fail` is the zero value and validates cleanly. It represents "abort on any collision".
     [Fact]
     public void Fail_is_zero_and_validates()
@@ -13,20 +20,11 @@ public class ExistsPolicyTests {
         Should.NotThrow(() => ExistsPolicyValidator.Validate(ExistsPolicy.Fail, "policy"));
     }
 
-    public static TheoryData<ExistsPolicy> NamedCombinations => [
-        ExistsPolicy.Fail,
-        ExistsPolicy.MergeAndSkip,
-        ExistsPolicy.MergeAndOverwrite,
-        ExistsPolicy.MergeAndOverwriteIfNewer,
-    ];
-
     // Every named combination is a valid policy.
     [Theory]
     [MemberData(nameof(NamedCombinations))]
-    public void Named_combinations_validate(ExistsPolicy policy)
-    {
-        Should.NotThrow(() => ExistsPolicyValidator.Validate(policy, nameof(policy)));
-    }
+    public void Named_combinations_validate(ExistsPolicy policy) =>
+            Should.NotThrow(() => ExistsPolicyValidator.Validate(policy, nameof(policy)));
 
     // Two file behaviors in the same policy is a user error -- the message must name both.
     [Fact]
@@ -74,20 +72,16 @@ public class ExistsPolicyTests {
 
     // Named combinations must equal the exact bitwise OR they document -- Plan 04 relies on this.
     [Fact]
-    public void MergeAndSkip_decomposes_correctly()
-    {
-        ExistsPolicy.MergeAndSkip.ShouldBe(ExistsPolicy.FileSkip | ExistsPolicy.DirectoryMerge);
-    }
+    public void MergeAndSkip_decomposes_correctly() =>
+            ExistsPolicy.MergeAndSkip.ShouldBe(ExistsPolicy.FileSkip | ExistsPolicy.DirectoryMerge);
 
     [Fact]
-    public void MergeAndOverwrite_decomposes_correctly()
-    {
-        ExistsPolicy.MergeAndOverwrite.ShouldBe(ExistsPolicy.FileOverwrite | ExistsPolicy.DirectoryMerge);
-    }
+    public void MergeAndOverwrite_decomposes_correctly() =>
+            ExistsPolicy.MergeAndOverwrite.ShouldBe(ExistsPolicy.FileOverwrite | ExistsPolicy.DirectoryMerge);
 
     [Fact]
-    public void MergeAndOverwriteIfNewer_decomposes_correctly()
-    {
-        ExistsPolicy.MergeAndOverwriteIfNewer.ShouldBe(ExistsPolicy.FileOverwriteIfNewer | ExistsPolicy.DirectoryMerge);
-    }
+    public void MergeAndOverwriteIfNewer_decomposes_correctly() =>
+            ExistsPolicy.MergeAndOverwriteIfNewer.ShouldBe(
+                ExistsPolicy.FileOverwriteIfNewer | ExistsPolicy.DirectoryMerge
+            );
 }

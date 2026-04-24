@@ -19,7 +19,7 @@ public sealed class MPathFileSystemExistenceTests : IDisposable {
     public void Dispose()
     {
         if (Directory.Exists(_tempRoot)) {
-            Directory.Delete(_tempRoot, recursive: true);
+            Directory.Delete(_tempRoot, true);
         }
     }
 
@@ -87,9 +87,7 @@ public sealed class MPathFileSystemExistenceTests : IDisposable {
     {
         MPath? p = null;
 
-        var ex = Should.Throw<ArgumentNullException>(
-            () => MPathFileSystemExtensions.FileExists(p!)
-        );
+        var ex = Should.Throw<ArgumentNullException>(() => p!.FileExists());
         ex.ParamName.ShouldBe("path");
     }
 
@@ -98,9 +96,7 @@ public sealed class MPathFileSystemExistenceTests : IDisposable {
     {
         MPath? p = null;
 
-        var ex = Should.Throw<ArgumentNullException>(
-            () => MPathFileSystemExtensions.DirectoryExists(p!)
-        );
+        var ex = Should.Throw<ArgumentNullException>(() => p!.DirectoryExists());
         ex.ParamName.ShouldBe("path");
     }
 }

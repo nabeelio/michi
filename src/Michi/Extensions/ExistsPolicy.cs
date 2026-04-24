@@ -98,8 +98,8 @@ internal static class ExistsPolicyValidator {
         var unknown = policy & ~AllKnownBits;
         if (unknown != 0) {
             throw new ArgumentException(
-                $"ExistsPolicy '{policy}' contains unknown flag value 0x{(int) unknown:X}. " +
-                $"Valid flags are: {string.Join(", ", GetEnumNames())}.",
+                $"ExistsPolicy '{policy}' contains unknown flag value 0x{(int) unknown:X}. "
+              + $"Valid flags are: {string.Join(", ", GetEnumNames())}.",
                 paramName
             );
         }
@@ -107,8 +107,8 @@ internal static class ExistsPolicyValidator {
         var fileBits = policy & FileBits;
         if (PopCount((int) fileBits) > 1) {
             throw new ArgumentException(
-                $"ExistsPolicy '{policy}' combines multiple file behaviors ({fileBits}). " +
-                "Choose exactly one of FileSkip, FileOverwrite, or FileOverwriteIfNewer -- or omit all three for fail-on-file.",
+                $"ExistsPolicy '{policy}' combines multiple file behaviors ({fileBits}). "
+              + "Choose exactly one of FileSkip, FileOverwrite, or FileOverwriteIfNewer -- or omit all three for fail-on-file.",
                 paramName
             );
         }
@@ -116,8 +116,8 @@ internal static class ExistsPolicyValidator {
         var dirBits = policy & DirBits;
         if (PopCount((int) dirBits) > 1) {
             throw new ArgumentException(
-                $"ExistsPolicy '{policy}' combines multiple directory behaviors ({dirBits}). " +
-                "Choose exactly one of DirectoryMerge or DirectoryReplace -- or omit both for fail-on-directory.",
+                $"ExistsPolicy '{policy}' combines multiple directory behaviors ({dirBits}). "
+              + "Choose exactly one of DirectoryMerge or DirectoryReplace -- or omit both for fail-on-directory.",
                 paramName
             );
         }
