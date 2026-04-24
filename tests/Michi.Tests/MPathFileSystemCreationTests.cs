@@ -241,7 +241,7 @@ public sealed class MPathFileSystemCreationTests : IDisposable {
         var ex = Should.Throw<IOException>(() => target.CreateOrClearDirectory());
 
         ex.Message.ShouldContain(filePath);
-        ex.Message.ShouldContain("file", Case.Insensitive);
+        ex.Message.ShouldContain("file");
 
         // The file must not be replaced or deleted -- explicit check per D-06.
         File.Exists(filePath).ShouldBeTrue();

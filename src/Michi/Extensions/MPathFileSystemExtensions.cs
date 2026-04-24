@@ -135,8 +135,8 @@ public static class MPathFileSystemExtensions {
         if (File.Exists(path.Value)) {
             throw new IOException(
                 $"Cannot create-or-clear directory '{path.Value}': a file already exists at this path. "
-                + "CreateOrClearDirectory will not replace a file with a directory. "
-                + "Delete the file explicitly and retry."
+              + "CreateOrClearDirectory will not replace a file with a directory. "
+              + "Delete the file explicitly and retry."
             );
         }
 
@@ -146,7 +146,7 @@ public static class MPathFileSystemExtensions {
             // keep their invariant across the clear.
             foreach (var entry in Directory.EnumerateFileSystemEntries(path.Value)) {
                 if (Directory.Exists(entry)) {
-                    Directory.Delete(entry, recursive: true);
+                    Directory.Delete(entry, true);
                 } else {
                     File.Delete(entry);
                 }
