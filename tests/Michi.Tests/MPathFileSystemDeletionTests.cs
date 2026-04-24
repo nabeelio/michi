@@ -112,7 +112,7 @@ public sealed class MPathFileSystemDeletionTests : IDisposable {
         Directory.CreateDirectory(dirPath);
         var target = MPath.From(dirPath);
 
-        target.DeleteDirectory(recursive: false);
+        target.DeleteDirectory(false);
 
         Directory.Exists(dirPath).ShouldBeFalse();
     }
@@ -127,7 +127,7 @@ public sealed class MPathFileSystemDeletionTests : IDisposable {
         File.WriteAllText(Path.Combine(dirPath, "a.txt"), "a");
         var target = MPath.From(dirPath);
 
-        Should.Throw<IOException>(() => target.DeleteDirectory(recursive: false));
+        Should.Throw<IOException>(() => target.DeleteDirectory(false));
 
         // Directory must still be present -- failure is clean.
         Directory.Exists(dirPath).ShouldBeTrue();
@@ -139,7 +139,7 @@ public sealed class MPathFileSystemDeletionTests : IDisposable {
     {
         var target = MPath.From(Path.Combine(_tempRoot, "missing-dir"));
 
-        Should.NotThrow(() => target.DeleteDirectory(recursive: true));
+        Should.NotThrow(() => target.DeleteDirectory());
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public sealed class MPathFileSystemDeletionTests : IDisposable {
     {
         var target = MPath.From(Path.Combine(_tempRoot, "missing-dir-nonrec"));
 
-        Should.NotThrow(() => target.DeleteDirectory(recursive: false));
+        Should.NotThrow(() => target.DeleteDirectory(false));
     }
 
     // Wrong-kind guard: a file at the target path produces an explicit IOException

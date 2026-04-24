@@ -54,9 +54,9 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
         File.WriteAllText(Path.Combine(_tempRoot, "sub", "b.txt"), "b");
 
         var names = root
-            .EnumerateFiles("*.txt", SearchOption.AllDirectories)
-            .Select(p => p.Name)
-            .ToHashSet();
+               .EnumerateFiles("*.txt", SearchOption.AllDirectories)
+               .Select(p => p.Name)
+               .ToHashSet();
 
         names.Count.ShouldBe(2);
         names.ShouldContain("a.txt");
@@ -73,9 +73,9 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
         File.WriteAllText(Path.Combine(_tempRoot, "skip.log"), "b");
 
         var names = root
-            .EnumerateFiles("*.txt", SearchOption.TopDirectoryOnly)
-            .Select(p => p.Name)
-            .ToHashSet();
+               .EnumerateFiles("*.txt", SearchOption.TopDirectoryOnly)
+               .Select(p => p.Name)
+               .ToHashSet();
 
         names.ShouldContain("keep.txt");
         names.ShouldNotContain("skip.log");
@@ -108,15 +108,15 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
 
         var counter = 0;
         var _ = root
-            .EnumerateFiles("*.txt", SearchOption.TopDirectoryOnly)
-            .Select(
-                p => {
-                    counter++;
-                    return p;
-                }
-            )
-            .Take(1)
-            .ToList();
+               .EnumerateFiles("*.txt", SearchOption.TopDirectoryOnly)
+               .Select(p => {
+                        counter++;
+
+                        return p;
+                    }
+                )
+               .Take(1)
+               .ToList();
 
         counter.ShouldBe(1);
     }
@@ -127,8 +127,8 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
     [Fact]
     public void EnumerateFiles_throws_eagerly_on_null_path()
     {
-        Should.Throw<ArgumentNullException>(
-            () => MPathFileSystemExtensions.EnumerateFiles(null!, "*", SearchOption.TopDirectoryOnly)
+        Should.Throw<ArgumentNullException>(() =>
+                MPathFileSystemExtensions.EnumerateFiles(null!, "*", SearchOption.TopDirectoryOnly)
         );
     }
 
@@ -137,9 +137,7 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
     {
         var root = MPath.From(_tempRoot);
 
-        Should.Throw<ArgumentNullException>(
-            () => root.EnumerateFiles(null!, SearchOption.TopDirectoryOnly)
-        );
+        Should.Throw<ArgumentNullException>(() => root.EnumerateFiles(null!, SearchOption.TopDirectoryOnly));
     }
 
     // Missing-path failure is BCL-driven and happens on first MoveNext (lazy). Document
@@ -166,9 +164,9 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
         File.WriteAllText(Path.Combine(_tempRoot, "b.txt"), "");
 
         var names = root
-            .EnumerateFiles("*.txt", SearchOption.TopDirectoryOnly)
-            .Select(p => p.Name)
-            .ToHashSet();
+               .EnumerateFiles("*.txt", SearchOption.TopDirectoryOnly)
+               .Select(p => p.Name)
+               .ToHashSet();
 
         names.Count.ShouldBe(3);
         names.ShouldContain("a.txt");
@@ -189,9 +187,9 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
         Directory.CreateDirectory(Path.Combine(_tempRoot, "d1", "nested"));
 
         var names = root
-            .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
-            .Select(p => p.Name)
-            .ToHashSet();
+               .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
+               .Select(p => p.Name)
+               .ToHashSet();
 
         names.Count.ShouldBe(2);
         names.ShouldContain("d1");
@@ -207,9 +205,9 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
         Directory.CreateDirectory(Path.Combine(_tempRoot, "d1", "nested"));
 
         var names = root
-            .EnumerateDirectories("*", SearchOption.AllDirectories)
-            .Select(p => p.Name)
-            .ToHashSet();
+               .EnumerateDirectories("*", SearchOption.AllDirectories)
+               .Select(p => p.Name)
+               .ToHashSet();
 
         names.Count.ShouldBe(2);
         names.ShouldContain("d1");
@@ -239,15 +237,15 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
 
         var counter = 0;
         var _ = root
-            .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
-            .Select(
-                p => {
-                    counter++;
-                    return p;
-                }
-            )
-            .Take(1)
-            .ToList();
+               .EnumerateDirectories("*", SearchOption.TopDirectoryOnly)
+               .Select(p => {
+                        counter++;
+
+                        return p;
+                    }
+                )
+               .Take(1)
+               .ToList();
 
         counter.ShouldBe(1);
     }
@@ -255,12 +253,11 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
     [Fact]
     public void EnumerateDirectories_throws_eagerly_on_null_path()
     {
-        Should.Throw<ArgumentNullException>(
-            () => MPathFileSystemExtensions.EnumerateDirectories(
-                null!,
-                "*",
-                SearchOption.TopDirectoryOnly
-            )
+        Should.Throw<ArgumentNullException>(() => MPathFileSystemExtensions.EnumerateDirectories(
+                    null!,
+                    "*",
+                    SearchOption.TopDirectoryOnly
+                )
         );
     }
 
@@ -269,14 +266,12 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
     {
         var root = MPath.From(_tempRoot);
 
-        Should.Throw<ArgumentNullException>(
-            () => root.EnumerateDirectories(null!, SearchOption.TopDirectoryOnly)
-        );
+        Should.Throw<ArgumentNullException>(() => root.EnumerateDirectories(null!, SearchOption.TopDirectoryOnly));
     }
 
     [Fact]
     public void
-        EnumerateDirectories_throws_DirectoryNotFoundException_on_missing_path_at_iteration_time()
+            EnumerateDirectories_throws_DirectoryNotFoundException_on_missing_path_at_iteration_time()
     {
         var missing = MPath.From(Path.Combine(_tempRoot, "does-not-exist"));
 
