@@ -589,6 +589,7 @@ public static class MPathFileSystemExtensions {
             if ((policy & ExistsPolicy.FileOverwrite) != 0) {
                 File.Delete(dest.Value);
                 File.Move(source.Value, dest.Value);
+
                 return;
             }
 
@@ -597,6 +598,7 @@ public static class MPathFileSystemExtensions {
                     File.Delete(dest.Value);
                     File.Move(source.Value, dest.Value);
                 }
+
                 // Otherwise skip silently -- source older or equal, destination wins.
                 return;
             }
@@ -644,6 +646,7 @@ public static class MPathFileSystemExtensions {
                 // signals "skip happened" and is left in place rather than throwing on a
                 // recursive=false delete.
                 RemoveIfEmpty(source);
+
                 return;
             } else {
                 throw new IOException(
@@ -719,6 +722,7 @@ public static class MPathFileSystemExtensions {
                 // The three-arg File.Copy(overwrite: true) overload is available on every
                 // TFM (including netstandard2.1), so no Delete+Copy dance is required.
                 File.Copy(source.Value, dest.Value, true);
+
                 return;
             }
 
@@ -767,6 +771,7 @@ public static class MPathFileSystemExtensions {
                 // Fall through to the fresh-create + recursive walk below.
             } else if ((policy & ExistsPolicy.DirectoryMerge) != 0) {
                 CopyDirectoryMergeInto(source, dest, policy, filter);
+
                 return;
             } else {
                 throw new IOException(

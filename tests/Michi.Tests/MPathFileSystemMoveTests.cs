@@ -37,6 +37,7 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         var dir = Path.GetDirectoryName(full)!;
         Directory.CreateDirectory(dir);
         File.WriteAllText(full, content);
+
         return MPath.From(full);
     }
 
@@ -44,10 +45,9 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
     {
         var full = TempPath(relative);
         Directory.CreateDirectory(full);
+
         return MPath.From(full);
     }
-
-#region Argument validation (eager, before any I/O)
 
     // Conflicting file bits must throw ArgumentException at the call site, before any
     // probe of the source path. We use a source path that does not exist on disk to
@@ -58,8 +58,11 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         var src = MPath.From(TempPath("does-not-exist-src.txt"));
         var dst = MPath.From(TempPath("does-not-exist-dst.txt"));
 
-        var ex = Should.Throw<ArgumentException>(
-            () => src.MoveTo(dst, ExistsPolicy.FileSkip | ExistsPolicy.FileOverwrite));
+        var ex = Should.Throw<ArgumentException>(() => src.MoveTo(
+                    dst,
+                    ExistsPolicy.FileSkip | ExistsPolicy.FileOverwrite
+                )
+        );
 
         ex.ParamName.ShouldBe("policy");
         ex.Message.ShouldContain("FileSkip");
@@ -72,8 +75,11 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         var src = MPath.From(TempPath("does-not-exist-src"));
         var dst = MPath.From(TempPath("does-not-exist-dst"));
 
-        var ex = Should.Throw<ArgumentException>(
-            () => src.MoveTo(dst, ExistsPolicy.DirectoryMerge | ExistsPolicy.DirectoryReplace));
+        var ex = Should.Throw<ArgumentException>(() => src.MoveTo(
+                    dst,
+                    ExistsPolicy.DirectoryMerge | ExistsPolicy.DirectoryReplace
+                )
+        );
 
         ex.ParamName.ShouldBe("policy");
         ex.Message.ShouldContain("DirectoryMerge");
@@ -99,10 +105,6 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         var ex = Should.Throw<ArgumentNullException>(() => src.MoveTo(dst!));
         ex.ParamName.ShouldBe("destination");
     }
-
-#endregion
-
-#region Destination resolution (D-17 + D-18)
 
     // Existing destination directory is treated as a parent container -- the resolved
     // target becomes destination/source.Name (cp/mv semantics).
@@ -134,10 +136,6 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         File.ReadAllText(TempPath("out/b.txt")).ShouldBe("hello");
     }
 
-#endregion
-
-#region Auto-parent-create (ROADMAP success criterion 5)
-
     // The parent of the resolved destination is auto-created if missing.
     [Fact]
     public void MoveTo_auto_creates_missing_destination_parent()
@@ -151,10 +149,6 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         Directory.Exists(TempPath("newparent")).ShouldBeTrue();
         File.Exists(TempPath("newparent/target.txt")).ShouldBeTrue();
     }
-
-#endregion
-
-#region File -> file policies
 
     [Fact]
     public void MoveTo_file_Fail_policy_throws_on_collision()
@@ -229,10 +223,6 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         File.Exists(src.Value).ShouldBeTrue();
         File.ReadAllText(dst.Value).ShouldBe("newer dst");
     }
-
-#endregion
-
-#region Directory -> directory policies (D-19)
 
     [Fact]
     public void MoveTo_directory_Fail_policy_throws_on_collision()
@@ -382,9 +372,9 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         var t0 = DateTime.UtcNow;
         // newer.txt: source > destination -> overwrite
         File.SetLastWriteTimeUtc(TempPath("dst-tree/src-tree/newer.txt"), t0.AddHours(-2));
-        File.SetLastWriteTimeUtc(TempPath("src-tree/newer.txt"),         t0.AddHours(-1));
+        File.SetLastWriteTimeUtc(TempPath("src-tree/newer.txt"), t0.AddHours(-1));
         // older.txt: source < destination -> skip
-        File.SetLastWriteTimeUtc(TempPath("src-tree/older.txt"),         t0.AddHours(-2));
+        File.SetLastWriteTimeUtc(TempPath("src-tree/older.txt"), t0.AddHours(-2));
         File.SetLastWriteTimeUtc(TempPath("dst-tree/src-tree/older.txt"), t0.AddHours(-1));
 
         srcDir.MoveTo(MPath.From(TempPath("dst-tree")), ExistsPolicy.MergeAndOverwriteIfNewer);
@@ -392,10 +382,6 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         File.ReadAllText(TempPath("dst-tree/src-tree/newer.txt")).ShouldBe("src-newer");
         File.ReadAllText(TempPath("dst-tree/src-tree/older.txt")).ShouldBe("dst-older");
     }
-
-#endregion
-
-#region Wrong-kind (D-20)
 
     [Fact]
     public void MoveTo_directory_into_existing_file_throws_IOException()
@@ -407,8 +393,7 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         MakeDir("dst-parent");
         WriteFile("dst-parent/src-tree", "i am a file");
 
-        var ex = Should.Throw<IOException>(
-            () => srcDir.MoveTo(MPath.From(TempPath("dst-parent"))));
+        var ex = Should.Throw<IOException>(() => srcDir.MoveTo(MPath.From(TempPath("dst-parent"))));
 
         ex.Message.ShouldContain(srcDir.Value);
         // Source untouched.
@@ -427,10 +412,6 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         File.Exists(TempPath("out/a.txt")).ShouldBeTrue();
     }
 
-#endregion
-
-#region Same-path no-op
-
     [Fact]
     public void MoveTo_same_path_is_noop()
     {
@@ -441,6 +422,4 @@ public sealed class MPathFileSystemMoveTests : IDisposable {
         File.Exists(src.Value).ShouldBeTrue();
         File.ReadAllText(src.Value).ShouldBe("hello");
     }
-
-#endregion
 }

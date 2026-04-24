@@ -40,6 +40,7 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         var dir = Path.GetDirectoryName(full)!;
         Directory.CreateDirectory(dir);
         File.WriteAllText(full, content);
+
         return MPath.From(full);
     }
 
@@ -47,10 +48,9 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
     {
         var full = TempPath(relative);
         Directory.CreateDirectory(full);
+
         return MPath.From(full);
     }
-
-#region Argument validation (eager, before any I/O)
 
     [Fact]
     public void CopyTo_throws_eagerly_on_conflicting_file_bits()
@@ -58,8 +58,11 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         var src = MPath.From(TempPath("does-not-exist-src.txt"));
         var dst = MPath.From(TempPath("does-not-exist-dst.txt"));
 
-        var ex = Should.Throw<ArgumentException>(
-            () => src.CopyTo(dst, ExistsPolicy.FileSkip | ExistsPolicy.FileOverwrite));
+        var ex = Should.Throw<ArgumentException>(() => src.CopyTo(
+                    dst,
+                    ExistsPolicy.FileSkip | ExistsPolicy.FileOverwrite
+                )
+        );
 
         ex.ParamName.ShouldBe("policy");
     }
@@ -70,8 +73,11 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         var src = MPath.From(TempPath("does-not-exist-src"));
         var dst = MPath.From(TempPath("does-not-exist-dst"));
 
-        var ex = Should.Throw<ArgumentException>(
-            () => src.CopyTo(dst, ExistsPolicy.DirectoryMerge | ExistsPolicy.DirectoryReplace));
+        var ex = Should.Throw<ArgumentException>(() => src.CopyTo(
+                    dst,
+                    ExistsPolicy.DirectoryMerge | ExistsPolicy.DirectoryReplace
+                )
+        );
 
         ex.ParamName.ShouldBe("policy");
     }
@@ -95,10 +101,6 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         var ex = Should.Throw<ArgumentNullException>(() => src.CopyTo(dst!));
         ex.ParamName.ShouldBe("destination");
     }
-
-#endregion
-
-#region Destination resolution
 
     [Fact]
     public void CopyTo_resolves_existing_directory_destination_as_container()
@@ -158,10 +160,6 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         File.Exists(TempPath("dst-tree/sub/b.txt")).ShouldBeTrue();
     }
 
-#endregion
-
-#region Auto-parent-create
-
     [Fact]
     public void CopyTo_auto_creates_missing_destination_parent()
     {
@@ -173,10 +171,6 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         Directory.Exists(TempPath("newparent")).ShouldBeTrue();
         File.Exists(TempPath("newparent/target.txt")).ShouldBeTrue();
     }
-
-#endregion
-
-#region File -> file policies
 
     [Fact]
     public void CopyTo_file_Fail_policy_throws_on_collision()
@@ -244,10 +238,6 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         File.ReadAllText(dst.Value).ShouldBe("newer dst");
     }
 
-#endregion
-
-#region Directory -> directory policies (D-19)
-
     [Fact]
     public void CopyTo_directory_Fail_policy_throws_on_collision()
     {
@@ -260,8 +250,7 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         MakeDir("dst-tree/src-tree");
         WriteFile("dst-tree/src-tree/preexisting.txt", "pre");
 
-        Should.Throw<IOException>(
-            () => srcDir.CopyTo(MPath.From(TempPath("dst-tree"))));
+        Should.Throw<IOException>(() => srcDir.CopyTo(MPath.From(TempPath("dst-tree"))));
 
         // Destination preexisting content untouched.
         File.Exists(TempPath("dst-tree/src-tree/preexisting.txt")).ShouldBeTrue();
@@ -359,8 +348,8 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
 
         var t0 = DateTime.UtcNow;
         File.SetLastWriteTimeUtc(TempPath("dst-tree/src-tree/newer.txt"), t0.AddHours(-2));
-        File.SetLastWriteTimeUtc(TempPath("src-tree/newer.txt"),         t0.AddHours(-1));
-        File.SetLastWriteTimeUtc(TempPath("src-tree/older.txt"),         t0.AddHours(-2));
+        File.SetLastWriteTimeUtc(TempPath("src-tree/newer.txt"), t0.AddHours(-1));
+        File.SetLastWriteTimeUtc(TempPath("src-tree/older.txt"), t0.AddHours(-2));
         File.SetLastWriteTimeUtc(TempPath("dst-tree/src-tree/older.txt"), t0.AddHours(-1));
 
         srcDir.CopyTo(MPath.From(TempPath("dst-tree")), ExistsPolicy.MergeAndOverwriteIfNewer);
@@ -368,10 +357,6 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         File.ReadAllText(TempPath("dst-tree/src-tree/newer.txt")).ShouldBe("src-newer");
         File.ReadAllText(TempPath("dst-tree/src-tree/older.txt")).ShouldBe("dst-older");
     }
-
-#endregion
-
-#region Wrong-kind (D-20)
 
     [Fact]
     public void CopyTo_directory_into_existing_file_throws_IOException()
@@ -382,17 +367,12 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         MakeDir("dst-parent");
         WriteFile("dst-parent/src-tree", "i am a file");
 
-        var ex = Should.Throw<IOException>(
-            () => srcDir.CopyTo(MPath.From(TempPath("dst-parent"))));
+        var ex = Should.Throw<IOException>(() => srcDir.CopyTo(MPath.From(TempPath("dst-parent"))));
 
         ex.Message.ShouldContain(srcDir.Value);
         // Source preserved.
         Directory.Exists(srcDir.Value).ShouldBeTrue();
     }
-
-#endregion
-
-#region Same-path no-op
 
     [Fact]
     public void CopyTo_same_path_is_noop()
@@ -403,10 +383,6 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
         Should.NotThrow(() => src.CopyTo(dst));
         File.ReadAllText(src.Value).ShouldBe("hello");
     }
-
-#endregion
-
-#region Filter callback (D-22 through D-25)
 
     // Filter excludes a file by returning false. Recursive directory copy enumerates
     // both files and directories; for each item, the filter decides include vs skip.
@@ -419,7 +395,8 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
 
         srcDir.CopyTo(
             MPath.From(TempPath("dst-tree")),
-            filter: p => p.Extension != ".log");
+            filter: p => p.Extension != ".log"
+        );
 
         File.Exists(TempPath("dst-tree/a.txt")).ShouldBeTrue();
         File.Exists(TempPath("dst-tree/b.log")).ShouldBeFalse();
@@ -436,7 +413,8 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
 
         srcDir.CopyTo(
             MPath.From(TempPath("dst-tree")),
-            filter: p => p.Name != "build");
+            filter: p => p.Name != "build"
+        );
 
         File.Exists(TempPath("dst-tree/src/z.txt")).ShouldBeTrue();
         Directory.Exists(TempPath("dst-tree/build")).ShouldBeFalse();
@@ -454,8 +432,10 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
             MPath.From(TempPath("b.txt")),
             filter: _ => {
                 Interlocked.Increment(ref invocations);
+
                 return true;
-            });
+            }
+        );
 
         invocations.ShouldBe(0);
         File.Exists(TempPath("b.txt")).ShouldBeTrue();
@@ -476,8 +456,10 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
             MPath.From(TempPath("dst-tree")),
             filter: p => {
                 seen.Add(p);
+
                 return true;
-            });
+            }
+        );
 
         // Every observed argument starts at the source root, never at the destination.
         seen.ShouldNotBeEmpty();
@@ -498,12 +480,11 @@ public sealed class MPathFileSystemCopyTests : IDisposable {
 
         srcDir.CopyTo(
             MPath.From(TempPath("dst-tree")),
-            filter: p => p.Name != "skip");
+            filter: p => p.Name != "skip"
+        );
 
         Directory.Exists(TempPath("dst-tree/keep")).ShouldBeTrue();
         File.Exists(TempPath("dst-tree/keep/a.txt")).ShouldBeTrue();
         Directory.Exists(TempPath("dst-tree/skip")).ShouldBeFalse();
     }
-
-#endregion
 }
