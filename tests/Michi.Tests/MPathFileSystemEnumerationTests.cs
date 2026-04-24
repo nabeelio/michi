@@ -1,4 +1,4 @@
-using Michi.Extensions;
+using Michi.FileSystem;
 using Shouldly;
 using Xunit;
 
@@ -128,7 +128,7 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
     public void EnumerateFiles_throws_eagerly_on_null_path()
     {
         Should.Throw<ArgumentNullException>(() =>
-                MPathFileSystemExtensions.EnumerateFiles(null!, "*", SearchOption.TopDirectoryOnly)
+                MPathExtensions.EnumerateFiles(null!, "*", SearchOption.TopDirectoryOnly)
         );
     }
 
@@ -253,7 +253,7 @@ public sealed class MPathFileSystemEnumerationTests : IDisposable {
     [Fact]
     public void EnumerateDirectories_throws_eagerly_on_null_path()
     {
-        Should.Throw<ArgumentNullException>(() => MPathFileSystemExtensions.EnumerateDirectories(
+        Should.Throw<ArgumentNullException>(() => MPathExtensions.EnumerateDirectories(
                     null!,
                     "*",
                     SearchOption.TopDirectoryOnly

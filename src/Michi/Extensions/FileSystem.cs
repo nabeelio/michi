@@ -1,10 +1,15 @@
 using Michi.Internal;
 
-namespace Michi.Extensions;
+// File lives under src/Michi/Extensions/ (historical layout). Namespace is `Michi.FileSystem`
+// to follow the LINQ / NodaTime convention of feature-domain naming rather than
+// `{Lib}.Extensions.{Concern}`. The folder name is retained for git-history continuity;
+// the namespace is the actual public-API contract.
+// ReSharper disable once CheckNamespace
+namespace Michi.FileSystem;
 
 /// <summary>
 /// Opt-in filesystem extension methods on <see cref="MPath" />. Import with
-/// `using Michi.Extensions;` when filesystem-facing operations are needed. The core `MPath`
+/// `using Michi.FileSystem;` when filesystem-facing operations are needed. The core `MPath`
 /// type intentionally has no filesystem behavior.
 /// </summary>
 /// <remarks>
@@ -18,7 +23,7 @@ namespace Michi.Extensions;
 /// README "Security" section for the full guarantees and non-guarantees.
 /// </para>
 /// </remarks>
-public static class MPathFileSystemExtensions {
+public static class MPathExtensions {
 #region Existence
 
     /// <summary>

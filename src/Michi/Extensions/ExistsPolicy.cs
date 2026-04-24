@@ -1,4 +1,10 @@
-namespace Michi.Extensions;
+// File lives under src/Michi/Extensions/ (historical layout). Namespace is `Michi.FileSystem`
+// to follow the LINQ / NodaTime convention of feature-domain naming rather than
+// `{Lib}.Extensions.{Concern}`. The folder name is retained for git-history continuity;
+// the namespace is the actual public-API contract.
+// ReSharper disable once CheckNamespace
+
+namespace Michi.FileSystem;
 
 /// <summary>
 /// Conflict policy for filesystem move/copy operations. Combines at most one file behavior

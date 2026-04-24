@@ -1,4 +1,4 @@
-using Michi.Extensions;
+using Michi.FileSystem;
 using Shouldly;
 using Xunit;
 
