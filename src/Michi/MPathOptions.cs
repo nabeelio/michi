@@ -50,7 +50,8 @@ public sealed record MPathOptions {
 
     /// <summary>
     /// Read-only singleton used when no explicit options are passed. Mirrors the
-    /// <see cref="System.Text.Json.JsonSerializerOptions.Default" /> pattern.
+    /// `JsonSerializerOptions.Default` pattern: a fixed default instance that callers
+    /// override per-call via record `with` rather than mutating shared state.
     /// </summary>
     public static MPathOptions Default { get; } = new();
 }

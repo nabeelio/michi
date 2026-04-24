@@ -17,10 +17,9 @@
     <DefineConstants>$(DefineConstants);CONTRACTS_FULL</DefineConstants>
   </PropertyGroup>
 
-  <!-- System.Text.Json is in-box on net8.0+ but ships as a NuGet package on netstandard2.1.
-       System.Collections.Immutable is in-box on net6+ but also needs a package on netstandard2.1. -->
+  <!-- System.Collections.Immutable is in-box on net6+ but ships as a NuGet package on
+       netstandard2.1. MPath holds a lazy ImmutableArray<string> segment cache. -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">
-    <PackageReference Include="System.Text.Json" />
     <PackageReference Include="System.Collections.Immutable" />
   </ItemGroup>
 

@@ -1,12 +1,9 @@
 using System.Collections.Immutable;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Globalization;
 using System.Text;
-using System.Text.Json.Serialization;
-using Michi.Converters;
 using Michi.Exceptions;
 using Michi.Internal;
 // Alias to disambiguate from the new instance-level Path property on MPath.
@@ -27,8 +24,6 @@ namespace Michi;
 /// when you need a deterministic, platform-independent string (logging, JSON, snapshots).
 /// </remarks>
 [DebuggerDisplay("{ToString(),nq}")]
-[JsonConverter(typeof(MPathJsonConverter))]
-[TypeConverter(typeof(MPathTypeConverter))]
 public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     // Directory separator characters, cached so IndexOfAny calls don't allocate a new
     // char[] on every invocation.

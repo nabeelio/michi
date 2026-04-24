@@ -216,26 +216,28 @@ var homeConfig = MPath.From("~/.config/myapp/settings.json", opts);
 
 ## Serialization
 
-`[JsonConverter]` and `[TypeConverter]` are already on `MPath`. Nothing to register.
+JSON, `IConfiguration` binding, and ASP.NET model binding are deferred until
+`MPathRelative` lands. The shape of those converters depends on whether config
+files express relative paths or absolute paths in an `MPath`-typed field, and
+locking that choice now without `MPathRelative` would force a SemVer break later.
+
+For now, round-trip through `string` manually:
 
 ```csharp
 using System.Text.Json;
 using Michi;
 
-var original = MPath.From(@"C:\work\logs\today.log");
-var json = JsonSerializer.Serialize(original);       // "\"C:/work/logs/today.log\""
-var back = JsonSerializer.Deserialize<MPath>(json);  // same-host round-trip
-
-// IConfiguration, ASP.NET model binding, WPF PropertyGrid all work via TypeConverter
+var p = MPath.From(@"C:\work\logs\today.log");
+var json = JsonSerializer.Serialize(p.ToUnixString());        // "C:/work/logs/today.log"
+var back = MPath.From(JsonSerializer.Deserialize<string>(json)!);
 ```
 
-JSON always writes canonical forward-slash form, so payloads stay identical across hosts. 
-Deserialization still uses the current OS rules, so a foreign-root payload like 
-`C:/work/logs/today.log` may or may not parse depending on where you run it. Not a supported 
-cross-OS portability mechanism.
+Use `ToUnixString()` for the JSON form so payloads stay identical across Windows
+and Unix hosts. Deserialization still uses the current OS's path rules.
 
-**Coming:** `MPathRelative` for serialization. Has to be joined with an `MPath` to resolve, 
-so config files stay relative after round-trip instead of turning absolute.
+**Coming:** `MPathRelative` plus `[JsonConverter]` and `[TypeConverter]` designed
+around the relative/absolute distinction. Config files stay relative after
+round-trip instead of turning absolute.
 
 ## Security
 
