@@ -308,4 +308,91 @@ public static class MPathFileSystemExtensions {
     }
 
 #endregion
+
+#region Deletion
+
+    /// <summary>
+    /// Deletes the file at this path. Idempotent -- if the file does not exist, this is
+    /// a no-op. Throws if a *directory* exists at the path rather than silently treating
+    /// the wrong-kind target as success.
+    /// </summary>
+    /// <param name="path">The file path to delete. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">`path` is null.</exception>
+    /// <exception cref="IOException">
+    /// A directory (not a file) exists at `path`. The message names the path and points
+    /// at <see cref="DeleteDirectory" /> as the remedy.
+    /// </exception>
+    /// <remarks>
+    /// The wrong-kind probe uses <see cref="Directory.Exists(string)" />, which follows
+    /// directory symlinks. A hostile symlink pointing at a directory will therefore trip
+    /// this guard -- intentionally, since the consumer asked to delete a *file* and a
+    /// traversable directory is not that.
+    /// </remarks>
+    public static void DeleteFile(this MPath path)
+    {
+        Guard.NotNull(path);
+
+        if (Directory.Exists(path.Value)) {
+            throw new IOException(
+                $"Cannot DeleteFile '{path.Value}': a directory exists at this path. "
+              + "DeleteFile will not delete directories -- use DeleteDirectory() if you "
+              + "intended to delete the directory tree."
+            );
+        }
+
+        // File.Delete is already idempotent when the file is missing -- it just returns.
+        File.Delete(path.Value);
+    }
+
+    /// <summary>
+    /// Deletes the directory at this path. Idempotent -- if the directory does not
+    /// exist, this is a no-op. Recursive by default; pass `recursive: false` to require
+    /// an empty directory (matching <see cref="Directory.Delete(string, bool)" />
+    /// semantics: a non-empty directory throws). Throws if a *file* exists at the path
+    /// rather than silently treating the wrong-kind target as success.
+    /// </summary>
+    /// <param name="path">The directory path to delete. Must not be null.</param>
+    /// <param name="recursive">
+    /// When `true` (default), removes the directory and all contents. When `false`,
+    /// throws <see cref="IOException" /> if the directory is non-empty.
+    /// </param>
+    /// <exception cref="ArgumentNullException">`path` is null.</exception>
+    /// <exception cref="IOException">
+    /// A file (not a directory) exists at `path` -- the message names the path and
+    /// points at <see cref="DeleteFile" /> as the remedy -- or `recursive` is `false`
+    /// and the directory is non-empty (BCL message).
+    /// </exception>
+    /// <remarks>
+    /// The wrong-kind probe runs BEFORE the idempotency probe. Otherwise a path where a
+    /// file exists would fall through to the "directory does not exist" no-op branch
+    /// and silently succeed, hiding the wrong-kind mistake from the caller.
+    /// <para>
+    /// With `recursive: true` the underlying
+    /// <see cref="Directory.Delete(string, bool)" /> follows directory symlinks. On an
+    /// attacker-controlled filesystem a hostile symlink can cause deletion of data
+    /// outside the target. See the README "Security" section.
+    /// </para>
+    /// </remarks>
+    public static void DeleteDirectory(this MPath path, bool recursive = true)
+    {
+        Guard.NotNull(path);
+
+        // Wrong-kind check runs BEFORE the missing-directory idempotency check so a file
+        // at the path produces the explicit D-13 error instead of silently returning.
+        if (File.Exists(path.Value)) {
+            throw new IOException(
+                $"Cannot DeleteDirectory '{path.Value}': a file exists at this path. "
+              + "DeleteDirectory will not delete files -- use DeleteFile() if you "
+              + "intended to delete the file."
+            );
+        }
+
+        if (!Directory.Exists(path.Value)) {
+            return;
+        }
+
+        Directory.Delete(path.Value, recursive);
+    }
+
+#endregion
 }
