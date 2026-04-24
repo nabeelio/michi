@@ -395,4 +395,243 @@ public static class MPathFileSystemExtensions {
     }
 
 #endregion
+
+#region Move and copy
+
+    /// <summary>
+    /// Moves the file or directory at this path to `destination`. Destination resolution
+    /// follows cp/mv semantics: if `destination` already exists and is a directory, it is
+    /// treated as a parent container and the actual target becomes
+    /// `destination / source.Name`. Otherwise `destination` is the exact target. The
+    /// parent of the resolved target is auto-created when missing.
+    /// </summary>
+    /// <param name="source">The file or directory to move. Must not be null.</param>
+    /// <param name="destination">The target path or container directory. Must not be null.</param>
+    /// <param name="policy">
+    /// Conflict policy. Default <see cref="ExistsPolicy.Fail" /> -- any existing file or
+    /// directory at the resolved target throws. Use the named combinations (for example
+    /// <see cref="ExistsPolicy.MergeAndOverwrite" />) for non-default behavior. Conflicting
+    /// flag combinations throw <see cref="ArgumentException" /> before any filesystem I/O.
+    /// </param>
+    /// <exception cref="ArgumentNullException">`source` or `destination` is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// `policy` combines multiple file behaviors, multiple directory behaviors, or contains
+    /// unknown bits. Thrown before any filesystem state is probed.
+    /// </exception>
+    /// <exception cref="IOException">
+    /// Wrong-kind conflict (directory source onto an existing file at the resolved target),
+    /// a fail-on-collision result, or an underlying BCL I/O error.
+    /// </exception>
+    /// <exception cref="FileNotFoundException">
+    /// `source` points at a missing file. Surfaced from the BCL `File.Move` call so consumers
+    /// get the standard exception shape.
+    /// </exception>
+    /// <remarks>
+    /// `FileSkip` on Move means "do not move the file" -- both the source and destination are
+    /// left in place when a skip occurs. Consumers wanting "move only when destination is
+    /// free" should use the default <see cref="ExistsPolicy.Fail" /> and react to the
+    /// <see cref="IOException" />.
+    /// <para>
+    /// `FileOverwrite` on netstandard2.1 is implemented as Delete + Move (the three-argument
+    /// `File.Move(src, dst, overwrite)` overload only exists on net5.0+). The window between
+    /// the delete and the move is non-atomic on netstandard2.1; on net8/net10 we still use
+    /// the same sequence so behavior is uniform across TFMs.
+    /// </para>
+    /// <para>
+    /// `FileOverwriteIfNewer` compares <see cref="File.GetLastWriteTimeUtc(string)" /> in UTC
+    /// to avoid DST-related off-by-one-hour comparisons.
+    /// </para>
+    /// <para>
+    /// `DirectoryReplace` deletes the resolved destination tree before moving. The delete
+    /// uses <see cref="Directory.Delete(string, bool)" /> which follows directory symlinks;
+    /// see the README "Security" section for the threat-model implications.
+    /// </para>
+    /// <para>
+    /// The destination probe (`Directory.Exists` / `File.Exists`) and the subsequent
+    /// move/copy are not atomic with respect to other processes (TOCTOU). On adversarial
+    /// filesystems use higher-level locking or atomic file APIs.
+    /// </para>
+    /// </remarks>
+    public static void MoveTo(
+        this MPath source,
+        MPath destination,
+        ExistsPolicy policy = ExistsPolicy.Fail
+    )
+    {
+        Guard.NotNull(source);
+        Guard.NotNull(destination);
+        ExistsPolicyValidator.Validate(policy, nameof(policy));
+
+        var resolvedDest = ResolveDestination(source, destination);
+
+        if (PathsEqual(source, resolvedDest)) {
+            // Same path -- treat as a successful no-op rather than dispatching to the BCL,
+            // which has surprising same-path behavior (File.Move throws; Directory.Move
+            // succeeds with no-op only sometimes).
+            return;
+        }
+
+        if (Directory.Exists(source.Value)) {
+            MoveDirectoryWithPolicy(source, resolvedDest, policy);
+        } else if (File.Exists(source.Value)) {
+            MoveFileWithPolicy(source, resolvedDest, policy);
+        } else {
+            // Source missing. Defer to the BCL so consumers get the standard
+            // FileNotFoundException shape and message.
+            File.Move(source.Value, resolvedDest.Value);
+        }
+    }
+
+#endregion
+
+#region Move/copy helpers (shared)
+
+    // cp/mv destination resolution (D-17 + D-18). When `destination` already exists as a
+    // directory, the resolved target is `destination / source.Name`. Otherwise the
+    // destination path is used exactly.
+    private static MPath ResolveDestination(MPath source, MPath destination)
+    {
+        if (Directory.Exists(destination.Value)) {
+            return destination / source.Name;
+        }
+
+        return destination;
+    }
+
+    // Host-OS-correct equality. MPath.Equals already routes through HostOs.PathComparer,
+    // so this is a one-liner -- but pulling it out documents the intent and prevents
+    // future contributors from comparing raw `Value` strings with the wrong comparison.
+    private static bool PathsEqual(MPath a, MPath b) => a.Equals(b);
+
+    private static void MoveFileWithPolicy(MPath source, MPath dest, ExistsPolicy policy)
+    {
+        dest.EnsureParentExists();
+
+        if (File.Exists(dest.Value)) {
+            if ((policy & ExistsPolicy.FileSkip) != 0) {
+                // Skip: source stays in place, destination untouched.
+                return;
+            }
+
+            if ((policy & ExistsPolicy.FileOverwrite) != 0) {
+                File.Delete(dest.Value);
+                File.Move(source.Value, dest.Value);
+                return;
+            }
+
+            if ((policy & ExistsPolicy.FileOverwriteIfNewer) != 0) {
+                if (File.GetLastWriteTimeUtc(source.Value) > File.GetLastWriteTimeUtc(dest.Value)) {
+                    File.Delete(dest.Value);
+                    File.Move(source.Value, dest.Value);
+                }
+                // Otherwise skip silently -- source older or equal, destination wins.
+                return;
+            }
+
+            // Fail (default).
+            throw new IOException(
+                $"Cannot move file '{source.Value}' to '{dest.Value}': destination file already exists. "
+              + "Pass ExistsPolicy.FileOverwrite, ExistsPolicy.FileOverwriteIfNewer, or ExistsPolicy.FileSkip to override."
+            );
+        }
+
+        if (Directory.Exists(dest.Value)) {
+            // Wrong-kind: file source onto a directory at the resolved target. Container
+            // resolution already ran -- if the destination is still a directory at this
+            // point, the caller passed an exact path that conflicts with a directory.
+            throw new IOException(
+                $"Cannot move file '{source.Value}' to '{dest.Value}': a directory exists at the destination. "
+              + "Wrong-kind conflicts are not silently resolved. Delete the directory explicitly and retry."
+            );
+        }
+
+        File.Move(source.Value, dest.Value);
+    }
+
+    private static void MoveDirectoryWithPolicy(MPath source, MPath dest, ExistsPolicy policy)
+    {
+        if (File.Exists(dest.Value)) {
+            // D-20: directory source + file destination -> explicit IOException.
+            throw new IOException(
+                $"Cannot move directory '{source.Value}' to '{dest.Value}': a file exists at the destination. "
+              + "Wrong-kind conflicts are not silently resolved. Delete the file explicitly and retry."
+            );
+        }
+
+        if (Directory.Exists(dest.Value)) {
+            // D-19: directory-vs-directory collision -- Fail / Replace / Merge.
+            if ((policy & ExistsPolicy.DirectoryReplace) != 0) {
+                dest.DeleteDirectory();
+                // Fall through to the bare Directory.Move below.
+            } else if ((policy & ExistsPolicy.DirectoryMerge) != 0) {
+                MergeDirectoryInto(source, dest, policy);
+                // After the merge, prune the source root only if it is fully empty. With
+                // FileSkip in play, skipped source files survive the merge by design --
+                // skip means "do not move this file". A non-empty source root therefore
+                // signals "skip happened" and is left in place rather than throwing on a
+                // recursive=false delete.
+                RemoveIfEmpty(source);
+                return;
+            } else {
+                throw new IOException(
+                    $"Cannot move directory '{source.Value}' to '{dest.Value}': destination directory already exists. "
+                  + "Pass ExistsPolicy.DirectoryMerge or ExistsPolicy.DirectoryReplace to override."
+                );
+            }
+        }
+
+        dest.EnsureParentExists();
+        Directory.Move(source.Value, dest.Value);
+    }
+
+    // Recursive merge for the Move side. File-level conflicts inside the merged tree
+    // honor the file bits in `policy` via `MoveFileWithPolicy`. The source side is
+    // emptied as we walk -- after a successful merge, every subdirectory has been
+    // deleted and every file has been moved.
+    //
+    // FileSkip on a merge leaves the source file in place; that means the source
+    // subtree may not be fully empty after this method returns. The caller in
+    // MoveDirectoryWithPolicy uses `DeleteDirectory(recursive: false)` on the source
+    // root, which throws if any skipped file remains. That is intentional -- callers
+    // mixing MergeAndSkip with Move learn loudly that "skip" means "the source survives".
+    private static void MergeDirectoryInto(MPath source, MPath dest, ExistsPolicy policy)
+    {
+        foreach (var srcFile in source.EnumerateFiles("*", SearchOption.TopDirectoryOnly)) {
+            var destFile = dest / srcFile.Name;
+            MoveFileWithPolicy(srcFile, destFile, policy);
+        }
+
+        foreach (var srcSub in source.EnumerateDirectories("*", SearchOption.TopDirectoryOnly)) {
+            var destSub = dest / srcSub.Name;
+            if (!destSub.DirectoryExists()) {
+                destSub.CreateDirectory();
+            }
+
+            MergeDirectoryInto(srcSub, destSub, policy);
+            // Source subdirectory drained when no skips happened -- remove it so the
+            // parent's eventual cleanup sees an empty tree. With FileSkip in play, a
+            // subdirectory may still contain skipped files; leave it in place in that case.
+            RemoveIfEmpty(srcSub);
+        }
+    }
+
+    // Best-effort prune. Used after merge-driven moves where FileSkip may have left
+    // files behind: deleting the source root unconditionally would throw, which is the
+    // wrong shape for a "skip means don't move" contract.
+    private static void RemoveIfEmpty(MPath path)
+    {
+        if (!Directory.Exists(path.Value)) {
+            return;
+        }
+
+        // EnumerateFileSystemEntries is lazy -- this Any() call short-circuits on the
+        // first entry without walking the whole tree.
+        if (Directory.EnumerateFileSystemEntries(path.Value).Any()) {
+            return;
+        }
+
+        Directory.Delete(path.Value, false);
+    }
+
+#endregion
 }
