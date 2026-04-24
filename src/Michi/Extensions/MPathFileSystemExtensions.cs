@@ -159,4 +159,39 @@ public static class MPathFileSystemExtensions {
     }
 
 #endregion
+
+#region Interop
+
+    /// <summary>
+    /// Returns a <see cref="FileInfo" /> pointing at this path. The file does not need
+    /// to exist -- construction is I/O-free and matches `new FileInfo(path)` semantics.
+    /// Use when the richer BCL API (timestamps, attributes, streams) is needed.
+    /// </summary>
+    /// <param name="path">The path to wrap. Must not be null.</param>
+    /// <returns>A <see cref="FileInfo" /> whose <see cref="FileSystemInfo.FullName" /> is `path.Value`.</returns>
+    /// <exception cref="ArgumentNullException">`path` is null.</exception>
+    public static FileInfo ToFileInfo(this MPath path)
+    {
+        Guard.NotNull(path);
+
+        return new(path.Value);
+    }
+
+    /// <summary>
+    /// Returns a <see cref="DirectoryInfo" /> pointing at this path. The directory does
+    /// not need to exist -- construction is I/O-free and matches `new DirectoryInfo(path)`
+    /// semantics. Use when the richer BCL API (timestamps, attributes, enumeration) is
+    /// needed.
+    /// </summary>
+    /// <param name="path">The path to wrap. Must not be null.</param>
+    /// <returns>A <see cref="DirectoryInfo" /> whose <see cref="FileSystemInfo.FullName" /> is `path.Value`.</returns>
+    /// <exception cref="ArgumentNullException">`path` is null.</exception>
+    public static DirectoryInfo ToDirectoryInfo(this MPath path)
+    {
+        Guard.NotNull(path);
+
+        return new(path.Value);
+    }
+
+#endregion
 }
