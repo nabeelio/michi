@@ -9,7 +9,7 @@ namespace Michi.Internal;
 /// </summary>
 internal static class TildeExpander {
     /// <summary>
-    /// If <paramref name="path" /> is `~` or starts with `~/` (or `~\`), replaces the
+    /// If `path` is `~` or starts with `~/` (or `~\`), replaces the
     /// tilde with <see cref="Environment.SpecialFolder.UserProfile" />. Throws
     /// <see cref="InvalidPathException" /> if the host has no user-profile folder.
     /// </summary>

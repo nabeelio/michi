@@ -2,17 +2,16 @@
 
 # Michi
 
-Michi (ミチ) means "path" in Japanese. The core type is `MPath`: a strongly-typed, immutable, absolute 
-path that normalizes at construction and behaves the same on Windows, macOS, and Linux.
+Michi (ミチ) means "path" in Japanese. The core type is `MPath`: a typed, immutable, value object
+representing an absolute path that normalizes at construction. Working on Windows, macOS and Linux
 
 - **M**odern Path
 - **M**anaged Path
 - **M**ichi Path
 
-Stop passing raw strings around for filesystem paths.
-
-I pulled this out of a larger project after looking for something like it on NuGet and coming up 
-empty. It had been running in production for years called "MPath"
+Stop passing raw strings around for paths! I pulled this out of a larger project after looking for
+something like it on NuGet and coming up empty. I've been using it in a WPF app that's been out for
+years, because it needs/creates paths for cache, database, profiles, scripts, etc.
 
 ## Install
 
@@ -69,8 +68,7 @@ The right side is always treated as relative. Leading `/` or `\` gets stripped, 
 `installRoot / "/etc"` gives you `{installRoot}/etc`, not `/etc`. 
 If you want to escape the base, use `..`.
 
-The main pattern I use: wrap app roots in your own type. My WPF application uses a lot of
-different paths - for cache, database, profiles, scripts, etc.
+The main pattern I use: wrap app roots in its own type, which you can use statically, or DI it.
 
 ```csharp
 public sealed class AppPaths
@@ -94,8 +92,6 @@ public sealed class AppPaths
 }
 
 var paths = new AppPaths(MPath.InstalledDirectory);
-
-// Or AppPaths with DI
 ```
 
 ## Normalization
@@ -133,12 +129,13 @@ var lookup = new Dictionary<MPath, int>(MPathComparer.OrdinalIgnoreCase);
 var p = MPath.From(@"C:\Users\alice");
 
 p.ToString();         // "C:\Users\alice"   OS-native
-p.Path;               // "C:\Users\alice"   same thing, as a property
+p.Value;              // "C:\Users\alice"   primary property form
+p.Path;               // "C:\Users\alice"   compatibility alias
 p.ToUnixString();     // "C:/Users/alice"   always forward slash
 p.ToWindowsString();  // "C:\Users\alice"   always backslash
 ```
 
-`ToString()` and `.Path` return the OS-native form, so `MPath` drops into `File.ReadAllText(p.Path)` and any other string API without conversion. For logs, JSON, cache keys, or anything else you want identical across platforms, use `ToUnixString()`.
+`ToString()` and `.Value` return the OS-native form, so `MPath` drops into `File.ReadAllText(p.Value)` and any other string API without conversion. `.Path` is still there as a compatibility alias. For logs, JSON, cache keys, or anything else you want identical across platforms, use `ToUnixString()`.
 
 ## Navigation
 

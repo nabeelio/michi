@@ -5,8 +5,7 @@ using Xunit;
 namespace Michi.Tests;
 
 public class MPathStringOutputTests {
-    // ToString returns the OS-native separator form on every platform (CORE-05 + D-19).
-    // Use ToUnixString when deterministic cross-platform output is required.
+    // ToString returns the OS-native separator form on every platform.
     [Fact]
     public void ToString_UsesOsNativeSeparators_OnUnix()
     {
@@ -49,9 +48,7 @@ public class MPathStringOutputTests {
         p.Path.ShouldBe(@"C:\a\b");
     }
 
-    // Path and ToString return the same string reference on repeat access -- the
-    // OS-native form is precomputed at construction (D-03). Capturing to a local
-    // first avoids ReSharper's EqualExpressionComparison warning on `p.Path == p.Path`.
+    // Path and ToString return the same cached OS-native string.
     [Fact]
     public void Path_IsReferenceStable_AcrossCalls()
     {
@@ -59,6 +56,15 @@ public class MPathStringOutputTests {
         var first = p.Path;
         ReferenceEquals(first, p.Path).ShouldBeTrue();
         ReferenceEquals(first, p.ToString()).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Value_ReturnsSameAsPathAndToString()
+    {
+        var p = MPath.From(PlatformTestHelpers.IsWindows ? @"C:\a\b" : "/a/b");
+
+        p.Value.ShouldBe(p.Path);
+        p.Value.ShouldBe(p.ToString());
     }
 
     // ToUnixString always uses forward slashes.

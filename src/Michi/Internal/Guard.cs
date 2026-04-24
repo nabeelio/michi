@@ -9,8 +9,8 @@ namespace Michi.Internal;
 /// </summary>
 internal static class Guard {
     /// <summary>
-    /// Throws <see cref="ArgumentNullException" /> when <paramref name="value" /> is null.
-    /// <paramref name="paramName" /> is captured automatically from the caller's argument
+    /// Throws <see cref="ArgumentNullException" /> when `value` is null.
+    /// `paramName` is captured automatically from the caller's argument
     /// expression -- callers do not pass it explicitly.
     /// </summary>
     /// <param name="value">The argument to null-check.</param>
@@ -18,7 +18,7 @@ internal static class Guard {
     /// <param name="paramName">
     /// Compiler-filled from the caller's argument expression. Do not pass explicitly.
     /// </param>
-    /// <exception cref="ArgumentNullException"><paramref name="value" /> is null.</exception>
+    /// <exception cref="ArgumentNullException">`value` is null.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void NotNull(
         [NotNull] object? value,

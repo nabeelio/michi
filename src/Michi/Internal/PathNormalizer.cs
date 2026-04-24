@@ -30,8 +30,8 @@ internal static class PathNormalizer {
         '\\',
     ];
 
-    /// <summary>Normalizes <paramref name="path" /> into a canonical absolute form.</summary>
-    /// <exception cref="ArgumentNullException"><paramref name="path" /> or <paramref name="options" /> is null.</exception>
+    /// <summary>Normalizes `path` into a canonical absolute form.</summary>
+    /// <exception cref="ArgumentNullException">`path` or `options` is null.</exception>
     /// <exception cref="InvalidPathException">
     /// Path is empty, can't resolve to absolute, or contains invalid characters.
     /// </exception>
@@ -110,7 +110,7 @@ internal static class PathNormalizer {
     /// </summary>
     /// <param name="segment">The single segment to validate.</param>
     /// <param name="segmentLabel">Human-readable label used in exception messages.</param>
-    /// <exception cref="InvalidPathException"><paramref name="segment" /> is not a valid single path segment.</exception>
+    /// <exception cref="InvalidPathException">`segment` is not a valid single path segment.</exception>
     internal static void ValidSinglePathSegment(string segment, string segmentLabel)
     {
         if (segment.Length == 0) {

@@ -153,10 +153,7 @@ public class MPathNormalizationTests {
         Should.NotThrow(() => MPath.From("/foo/b<ar"));
     }
 
-    // macOS rejects ':' in segments because Finder/Carbon legacy translates ':' to '/' in
-    // user-visible names, so round-tripping through Finder / AppleScript / NSURL would lie.
-    // See PITFALLS C-10 research: POSIX at the kernel level allows ':', but the Mac ecosystem
-    // does not.
+    // macOS rejects ':' in segments because user-visible Apple tooling treats it as a separator.
     [Fact]
     public void Normalization_ColonInSegment_OnMacOS_Throws()
     {

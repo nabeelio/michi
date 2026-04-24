@@ -20,9 +20,10 @@ namespace Michi;
 /// <remarks>
 /// Construct via <see cref="From(string, MPathOptions?)" /> or <see cref="TryFrom" />.
 /// The internal canonical form is forward-slash; <see cref="ToString" /> and the
-/// <see cref="Path" /> property both return the OS-native-separator form (backslash
+/// <see cref="Value" /> property both return the OS-native-separator form (backslash
 /// on Windows, forward-slash elsewhere) so paths drop into `System.IO` and most
-/// third-party string-typed APIs without extra conversion. Use <see cref="ToUnixString" />
+/// third-party string-typed APIs without extra conversion. <see cref="Path" /> remains
+/// as a compatibility alias for <see cref="Value" />. Use <see cref="ToUnixString" />
 /// when you need a deterministic, platform-independent string (logging, JSON, snapshots).
 /// </remarks>
 [DebuggerDisplay("{ToString(),nq}")]
@@ -37,8 +38,8 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     ];
 
     // Canonical forward-slash form. Derived values compute on demand via System.IO.Path.
-    // The OS-native form is stored as the Path auto-property below and assigned once
-    // in the ctor so ToString()/Path are O(1) allocation-free per CORE-05 + D-03.
+    // The OS-native form is stored as the Value auto-property below and assigned once
+    // in the ctor so ToString()/Value/Path are O(1) allocation-free.
     private readonly string _path;
 
     // Lazy segment cache. Default ImmutableArray<string> is `IsDefault == true`; we use
@@ -53,7 +54,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     private MPath(string normalizedPath, string root)
     {
         _path = normalizedPath;
-        Path = HostOs.IsWindows ? normalizedPath.Replace('/', '\\') : normalizedPath;
+        Value = HostOs.IsWindows ? normalizedPath.Replace('/', '\\') : normalizedPath;
         Root = root;
     }
 
@@ -178,11 +179,11 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 #region Construction
 
     /// <summary>
-    /// Normalizes <paramref name="path" /> and returns an <see cref="MPath" />.
+    /// Normalizes `path` and returns an <see cref="MPath" />.
     /// Relative inputs are resolved against <see cref="MPathOptions.BaseDirectory" />.
     /// </summary>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="path" /> is null.
+    /// `path` is null.
     /// </exception>
     /// <exception cref="InvalidPathException">
     /// Path cannot be normalized to a valid absolute path.
@@ -197,11 +198,11 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     }
 
     /// <summary>
-    /// Normalizes <paramref name="path" /> using <paramref name="relativeTo" /> as the base
+    /// Normalizes `path` using `relativeTo` as the base
     /// for relative-path resolution (overriding <see cref="MPathOptions.BaseDirectory" />).
     /// </summary>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="path" /> or <paramref name="relativeTo" /> is null.
+    /// `path` or `relativeTo` is null.
     /// </exception>
     /// <exception cref="InvalidPathException">
     /// Path cannot be normalized to a valid absolute path.
@@ -220,8 +221,8 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     }
 
     /// <summary>
-    /// Non-throwing construction. Returns <see langword="true" /> and sets <paramref name="result" />
-    /// if <paramref name="path" /> is normalizable; returns <see langword="false" /> with null result otherwise.
+    /// Non-throwing construction. Returns `true` and sets `result`
+    /// if `path` is normalizable; returns `false` with null result otherwise.
     /// Accepts null input without throwing.
     /// </summary>
     public static bool TryFrom(string? path, out MPath? result, MPathOptions? options = null)
@@ -244,24 +245,24 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     }
 
     /// <summary>
-    /// Substitutes <paramref name="args" /> into <paramref name="template" /> via
+    /// Substitutes `args` into `template` via
     /// <see cref="string.Format(IFormatProvider, string, object?[])" /> and constructs an
     /// <see cref="MPath" />. Uses <see cref="CultureInfo.InvariantCulture" /> so numeric and
     /// date formatting is locale-stable.
     /// </summary>
     /// <remarks>
-    /// <strong>Security:</strong> unvetted user input in <paramref name="args" /> can inject
+    /// <strong>Security:</strong> unvetted user input in `args` can inject
     /// `..` segments that escape the intended base. For untrusted input, compose via the
     /// `/` operator (which strips leading separators) and validate the result.
     /// </remarks>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="template" /> is null.
+    /// `template` is null.
     /// </exception>
     /// <exception cref="InvalidPathException">
     /// The substituted result is not a valid path.
     /// </exception>
     /// <exception cref="FormatException">
-    /// <paramref name="template" /> is malformed.
+    /// `template` is malformed.
     /// </exception>
     public static MPath Format(string template, params object?[] args)
     {
@@ -296,23 +297,28 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </summary>
     /// <remarks>
     /// For deterministic output across platforms (logging, JSON, snapshots, hashes), use
-    /// <see cref="ToUnixString" /> instead. The <see cref="Path" /> property returns the
-    /// same value as this method and is preferred in LINQ projections and data binding.
+    /// <see cref="ToUnixString" /> instead. The <see cref="Value" /> property returns the
+    /// same value as this method; <see cref="Path" /> is a compatibility alias.
     /// </remarks>
-    public override string ToString() => Path;
+    public override string ToString() => Value;
 
     /// <summary>
-    /// The path as a string, in OS-native separator form. Equivalent to <see cref="ToString" />;
-    /// provided as a property for LINQ projections, data binding, and pass-through to
-    /// string-typed APIs.
+    /// The primary string form of this path, in OS-native separators. Equivalent to
+    /// <see cref="ToString" /> and intended for LINQ projections, data binding, and
+    /// pass-through to string-typed APIs.
     /// </summary>
     /// <example>
     ///     <code>
-    /// File.ReadAllText(myPath.Path);
-    /// var names = paths.Select(p => p.Path);
+    /// File.ReadAllText(myPath.Value);
+    /// var names = paths.Select(p => p.Value);
     /// </code>
     /// </example>
-    public string Path { get; }
+    public string Value { get; }
+
+    /// <summary>
+    /// Compatibility alias for <see cref="Value" />. Equivalent to <see cref="ToString" />.
+    /// </summary>
+    public string Path => Value;
 
     /// <summary>
     /// Forward-slash form, identical on every platform. Use this when you need a stable,
@@ -433,7 +439,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     }
 
     /// <summary>
-    /// Returns <see langword="true" /> when both paths are equal under <see cref="HostOs.PathComparer" /> semantics.
+    /// Returns `true` when both paths are equal under <see cref="HostOs.PathComparer" /> semantics.
     /// </summary>
     public static bool operator ==(MPath? left, MPath? right)
     {
@@ -447,32 +453,32 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     }
 
     /// <summary>
-    /// Returns <see langword="true" /> when the two paths are not equal under <see cref="HostOs.PathComparer" /> semantics.
+    /// Returns `true` when the two paths are not equal under <see cref="HostOs.PathComparer" /> semantics.
     /// </summary>
     public static bool operator !=(MPath? left, MPath? right) => !(left == right);
 
     /// <summary>
-    /// Returns <see langword="true" /> when <paramref name="left" /> sorts before <paramref name="right" />.
-    /// <see langword="null" /> sorts before any path.
+    /// Returns `true` when `left` sorts before `right`.
+    /// `null` sorts before any path.
     /// </summary>
     public static bool operator <(MPath? left, MPath? right) =>
             left is null ? right is not null : left.CompareTo(right) < 0;
 
     /// <summary>
-    /// Returns <see langword="true" /> when <paramref name="left" /> sorts before or equal to <paramref name="right" />.
-    /// <see langword="null" /> sorts before any path.
+    /// Returns `true` when `left` sorts before or equal to `right`.
+    /// `null` sorts before any path.
     /// </summary>
     public static bool operator <=(MPath? left, MPath? right) => left is null || left.CompareTo(right) <= 0;
 
     /// <summary>
-    /// Returns <see langword="true" /> when <paramref name="left" /> sorts after <paramref name="right" />. Any path sorts
-    /// after <see langword="null" />.
+    /// Returns `true` when `left` sorts after `right`. Any path sorts
+    /// after `null`.
     /// </summary>
     public static bool operator >(MPath? left, MPath? right) => left is not null && left.CompareTo(right) > 0;
 
     /// <summary>
-    /// Returns <see langword="true" /> when <paramref name="left" /> sorts after or equal to <paramref name="right" />.
-    /// <see langword="null" /> is only greater-than-or-equal to <see langword="null" />.
+    /// Returns `true` when `left` sorts after or equal to `right`.
+    /// `null` is only greater-than-or-equal to `null`.
     /// </summary>
     public static bool operator >=(MPath? left, MPath? right) =>
             left is null ? right is null : left.CompareTo(right) >= 0;
@@ -490,7 +496,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     public MPath Parent => TryGetParent(out var parent) ? parent! : throw new NoParentException(this);
 
     /// <summary>
-    /// Non-throwing parent lookup. Returns <see langword="false" /> at root.
+    /// Non-throwing parent lookup. Returns `false` at root.
     /// </summary>
     public bool TryGetParent(out MPath? parent)
     {
@@ -507,12 +513,12 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return true;
     }
 
-    /// <summary>Walks <paramref name="levels" /> levels up the parent chain. `Up(0)` returns this.</summary>
+    /// <summary>Walks `levels` levels up the parent chain. `Up(0)` returns this.</summary>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <paramref name="levels" /> is negative.
+    /// `levels` is negative.
     /// </exception>
     /// <exception cref="NoParentException">
-    /// <paramref name="levels" /> exceeds <see cref="Depth" />.
+    /// `levels` exceeds <see cref="Depth" />.
     /// </exception>
     public MPath Up(int levels)
     {
@@ -545,15 +551,15 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 #region Joining
 
     /// <summary>
-    /// Joins a relative <paramref name="segment" /> beneath <paramref name="left" /> and re-normalizes.
+    /// Joins a relative `segment` beneath `left` and re-normalizes.
     /// Leading separators on the RHS are stripped, so the RHS is always treated as relative.
     /// </summary>
     /// <remarks>
     /// The segment can contain additional separators and `..`. After normalization the result
-    /// may escape <paramref name="left" />. For untrusted input, validate the result.
+    /// may escape `left`. For untrusted input, validate the result.
     /// </remarks>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="left" /> or <paramref name="segment" /> is null.
+    /// `left` or `segment` is null.
     /// </exception>
     /// <exception cref="InvalidPathException">
     /// The joined path is not a valid absolute path.
@@ -590,9 +596,13 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return new(result.Normalized, result.Root);
     }
 
-    // A fast-path segment is one where straight concatenation preserves path structure and doesn't
-    // need the normalizer to resolve separators or traversal components. Value validation still
-    // runs separately so this stays aligned with HostOs.InvalidSegmentChars.
+    /// <summary>
+    /// Returns whether a segment can be appended directly without full re-normalization.
+    /// </summary>
+    /// <remarks>
+    /// Fast-path segments are non-empty single segments with no separators and no `.` / `..`
+    /// traversal semantics. Value validation still runs separately.
+    /// </remarks>
     private static bool CanUseSingleSegmentFastPath(ReadOnlySpan<char> segment)
     {
         if (segment.IsEmpty) {
@@ -607,7 +617,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     }
 
     /// <summary>
-    /// Joins <paramref name="segments" /> beneath this path in order. Normalizes once at the end.
+    /// Joins `segments` beneath this path in order. Normalizes once at the end.
     /// Null or empty segments are skipped.
     /// </summary>
     public MPath Join(params string[]? segments)
@@ -646,7 +656,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 #region Containment
 
     /// <summary>
-    /// Resolves <paramref name="segment" /> against this path and verifies the result does not
+    /// Resolves `segment` against this path and verifies the result does not
     /// escape via `..` traversal. Use this to safely join user-supplied path fragments
     /// (archive entries, HTTP filenames, config values) under a trusted base.
     /// </summary>
@@ -655,7 +665,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     ///     This is a <strong>lexical</strong> check -- it operates on the normalized string form
     ///     and does not touch the filesystem. It rejects `../etc/passwd`-style escape and also
     ///     rejects sibling-prefix false positives (e.g. `/var/www-evil` is NOT contained in
-    ///     `/var/www`). Leading directory separators on <paramref name="segment" /> are stripped
+    ///     `/var/www`). Leading directory separators on `segment` are stripped
     ///     before resolution, so the segment is always treated as relative to this path --
     ///     consistent with the `/` operator.
     ///     </para>
@@ -680,10 +690,10 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// A new <see cref="MPath" /> that is either equal to this path or a descendant of it.
     /// </returns>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="segment" /> is null.
+    /// `segment` is null.
     /// </exception>
     /// <exception cref="InvalidPathException">
-    /// <paramref name="segment" /> is empty, whitespace-only, or resolves to no change
+    /// `segment` is empty, whitespace-only, or resolves to no change
     /// (bare `.` or `..`); contains invalid characters; or normalizes to a path above this
     /// path's boundary.
     /// </exception>
@@ -704,7 +714,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 
     /// <summary>
     /// Non-throwing counterpart to <see cref="ResolveContained" />. Returns
-    /// <see langword="false" /> for any reason <see cref="ResolveContained" /> would throw
+    /// `false` for any reason <see cref="ResolveContained" /> would throw
     /// <see cref="InvalidPathException" />, including empty/pure-dots input, invalid
     /// characters, and lexical escape.
     /// </summary>
@@ -716,9 +726,9 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     ///     </para>
     ///     <para>
     ///     Only <see cref="ArgumentNullException" /> escapes this method. Null
-    ///     <paramref name="segment" /> stays loud, mirroring <see cref="TryFrom" />'s contract.
-    ///     All other failure modes return <see langword="false" /> with <paramref name="result" />
-    ///     set to <see langword="null" />.
+    ///     `segment` stays loud, mirroring <see cref="TryFrom" />'s contract.
+    ///     All other failure modes return `false` with `result`
+    ///     set to `null`.
     ///     </para>
     /// </remarks>
     /// <param name="segment">
@@ -726,14 +736,14 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// </param>
     /// <param name="result">
     /// On success, the resolved contained <see cref="MPath" />; on failure,
-    /// <see langword="null" />.
+    /// `null`.
     /// </param>
     /// <returns>
-    /// <see langword="true" /> when <paramref name="segment" /> resolves to a path contained
-    /// under this path; <see langword="false" /> otherwise.
+    /// `true` when `segment` resolves to a path contained
+    /// under this path; `false` otherwise.
     /// </returns>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="segment" /> is null.
+    /// `segment` is null.
     /// </exception>
     public bool TryResolveContained(string segment, [NotNullWhen(true)] out MPath? result)
     {
@@ -745,38 +755,26 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return TryResolveContainedCore(segment, out result, out _);
     }
 
-    // Shared validation + normalization + containment check. Returns true on success; on
-    // failure, sets `failureReason` to a message fragment suitable for InvalidPathException's
-    // `reason` parameter. The reason string is cheap; the caller of ResolveContained builds
-    // the full exception from it. TryResolveContained discards the reason entirely -- no
-    // exception object is ever allocated in the non-throwing path (P2-04).
-    //
-    // Maintainer note: this helper is the single source of truth for D-37 (segment-boundary
-    // guard), D-41 (empty/pure-dots reject), D-42 (leading-separator strip), and D-43
-    // (normalizes-above rejection). Both public methods delegate here to keep the two
-    // behaviors symmetric. See .planning/phases/02-hierarchy-security-scope/02-CONTEXT.md
-    // for the decision rationale; the lexical-only scope (no symlink canonicalization) is
-    // an explicit project-level out-of-scope per PROJECT.md. In-library canonicalization
-    // would mean blocking I/O, TOCTOU-unsafe behavior, and an async-required API. Consumers
-    // in adversarial-filesystem threat models enforce symlink policy in the I/O layer via
-    // platform APIs (for example, openat-style flows on Unix or CreateFileW on Windows).
+    /// <summary>
+    /// Validates and resolves a contained segment without allocating an exception on failure.
+    /// </summary>
+    /// <remarks>
+    /// Shared by <see cref="ResolveContained(string)" /> and
+    /// <see cref="TryResolveContained(string, out MPath?)" /> so both methods use the same
+    /// validation, normalization, and failure-reason logic.
+    /// </remarks>
     private bool TryResolveContainedCore(
         string segment,
         out MPath? result,
         out string? failureReason
     )
     {
-        // D-42: strip exactly ONE leading separator so the segment is always relative.
-        // Do NOT use TrimStart (which strips multiple) -- UNC-like "//server/share" on
-        // Windows should only lose one separator per P2-03.
+        // Strip one leading separator so absolute-looking input still resolves under the base.
         var stripped = segment.Length > 0 && segment[0] is '/' or '\\'
-                ? segment.Substring(1)
+                ? segment[1..]
                 : segment;
 
-        // D-41: empty, '.', '..', or whitespace-only reject as InvalidPathException.
-        // These indicate a programmer bug (no-change target) rather than an escape attempt.
-        // The ORIGINAL segment is preserved in the exception for caller context; the
-        // stripped form is library-internal noise.
+        // Reject empty or no-op targets. Callers should name a concrete child path.
         if (string.IsNullOrWhiteSpace(stripped) || stripped is "." or "..") {
             result = null;
             failureReason = "Segment is empty or resolves to no change ('', '.', '..' alone are not valid targets)";
@@ -784,24 +782,20 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             return false;
         }
 
-        // D-43 + reuse Phase 01: delegate normalization to PathNormalizer with this path as
-        // the `relativeTo` base. That internally uses Path.GetFullPath(path, basePath) --
-        // two-arg overload only, no filesystem I/O, no single-arg CWD footgun.
+        // Normalize relative to the current path and reuse PathNormalizer's validation.
         NormalizationResult normalized;
         try {
             normalized = PathNormalizer.Normalize(stripped, MPathOptions.Default, _path);
         } catch (InvalidPathException ex) {
-            // PathNormalizer already built a consumer-friendly reason; surface it.
-            // We can't preserve its full message shape without allocating the exception,
-            // so we surface the Reason and let ResolveContained re-wrap. TryResolveContained
-            // just sees failure and returns false.
+            // Preserve PathNormalizer's human-readable reason without allocating a second
+            // exception for TryResolveContained.
             result = null;
             failureReason = ex.Reason;
 
             return false;
         }
 
-        // D-37 containment check: segment-boundary guard, not naive StartsWith.
+        // Containment is lexical: the normalized result must stay at or below the base path.
         if (!IsContained(_path, normalized.Normalized)) {
             result = null;
             failureReason =
@@ -816,47 +810,21 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
         return true;
     }
 
-    // NOTE on what this helper is and isn't:
-    //
-    // This is a LEXICAL containment check. It operates on already-normalized strings produced
-    // by PathNormalizer.Normalize, which resolves `..`/`./` via Path.GetFullPath's two-arg
-    // overload -- pure string math, no filesystem I/O.
-    //
-    // It does NOT canonicalize symlinks, and deliberately so. The temptation to "upgrade"
-    // ResolveContained into a symlink-aware pre-check keeps coming up; resist it. Reasons,
-    // in order of how they'll bite you:
-    //
-    //   1. Blocking I/O in a sync API. Any symlink-canonicalization pre-check hits the
-    //      filesystem. On a stale NFS or SMB mount this blocks for minutes.
-    //      MPath.ResolveContained is
-    //      documented as pure and [Pure]-attributed, callable from async hot paths
-    //      (per-request filename sanitization, ZIP extraction loops). Adding blocking I/O
-    //      is a breaking change even if the signature stays identical.
-    //   2. TOCTOU-unsafe even after canonicalization. An attacker can replace the path with
-    //      a symlink between the check here and the caller's actual File.Open call.
-    //      Canonicalizing inside the library gives the caller a false sense of security --
-    //      worse than no canonicalization at all, because the docs then have to walk it back.
-    //   3. Race-free containment requires OS-specific I/O APIs: `openat` + no-follow flags on
-    //      Unix, `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT` on Windows. That is
-    //      explicitly out of scope for this lexical core type. A future Michi.FileSystem
-    //      package may offer symlink-aware helpers once the async / cancellation-token story
-    //      is worked out in the core library.
-    //
-    // What consumers with adversarial-filesystem threat models should do is documented in
-    // the XML remarks on ResolveContained and in the README Security section. Do not expand
-    // this helper to handle symlinks; expand the docs instead.
-    //
-    // --- D-37 implementation notes ---
-    //
-    // Segment-boundary guard. Either (a) candidate equals ancestor exactly, or (b) the
-    // character immediately after the ancestor prefix is the canonical separator.
-    // PathNormalizer always produces forward-slash internally, so '/' is the only separator
-    // to check -- never '\\'. Uses HostOs.PathComparison per D-39 (the single comparison
-    // source), which is OrdinalIgnoreCase on Windows and macOS, Ordinal on Linux. No
-    // culture-sensitive comparison anywhere (AGENTS.md non-negotiable rule 4).
-    //
-    // Span-based compare avoids the allocation of `candidate.Substring(0, ancestor.Length)`
-    // that a plain string.Equals would force.
+    /// <summary>
+    /// Returns whether a normalized candidate path is equal to or contained under a normalized ancestor path.
+    /// </summary>
+    /// <remarks>
+    /// This is a lexical check on normalized forward-slash paths. Exact equality is allowed;
+    /// otherwise the candidate must continue with `/` so sibling-prefix matches like
+    /// `/var/www-evil` do not count as contained. This check does not resolve symlinks.
+    /// </remarks>
+    /// <example>
+    ///     <code>
+    /// IsContained("/var/www", "/var/www"); // true
+    /// IsContained("/var/www", "/var/www/uploads/file.txt"); // true
+    /// IsContained("/var/www", "/var/www-evil/file.txt"); // false
+    ///     </code>
+    /// </example>
     private static bool IsContained(string ancestor, string candidate)
     {
         if (candidate.Length < ancestor.Length) {
@@ -867,13 +835,12 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
             return false;
         }
 
-        // Exact equality: allowed (e.g. "a/.." normalizes to the base exactly).
+        // Exact equality is valid.
         if (candidate.Length == ancestor.Length) {
             return true;
         }
 
-        // Boundary guard: reject "/var/www-evil" under "/var/www". The next character after
-        // the ancestor prefix must be the canonical forward-slash separator.
+        // Require a path-segment boundary after the ancestor prefix.
         return candidate[ancestor.Length] == '/';
     }
 
@@ -882,16 +849,16 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
 #region Mutation
 
     /// <summary>
-    /// Returns a new <see cref="MPath" /> with the final segment replaced by <paramref name="name" />.
+    /// Returns a new <see cref="MPath" /> with the final segment replaced by `name`.
     /// The replacement must be a valid single path segment: non-empty, no directory separators,
     /// not `.` or `..`, free of platform-invalid segment characters, and on Windows not a
     /// reserved device name or a segment ending in `.` / space.
     /// </summary>
     /// <exception cref="ArgumentNullException">
-    /// <paramref name="name" /> is null.
+    /// `name` is null.
     /// </exception>
     /// <exception cref="InvalidPathException">
-    /// <paramref name="name" /> is empty, contains a directory separator, is `.` or `..`,
+    /// `name` is empty, contains a directory separator, is `.` or `..`,
     /// contains platform-invalid segment characters, is a Windows-reserved device name,
     /// ends with `.` / space on Windows, or this path is a root.
     /// </exception>
@@ -928,7 +895,7 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// <see cref="WithName(string)" />.
     /// </summary>
     /// <exception cref="InvalidPathException">
-    /// <paramref name="extension" /> is a bare "."; contains a directory separator; or,
+    /// `extension` is a bare "."; contains a directory separator; or,
     /// after combination with the current file name, produces an invalid single segment
     /// (for example `.` / `..`, a platform-invalid character, a Windows-reserved device name,
     /// trailing `.` / space on Windows, or any invalid name on a root path).
