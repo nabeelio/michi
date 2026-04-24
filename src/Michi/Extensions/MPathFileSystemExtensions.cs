@@ -482,6 +482,79 @@ public static class MPathFileSystemExtensions {
         }
     }
 
+    /// <summary>
+    /// Copies the file or directory at this path to `destination`. Behaves like
+    /// <see cref="MoveTo(MPath, MPath, ExistsPolicy)" /> with two differences: the source
+    /// is preserved, and recursive directory copies accept an optional `filter` callback
+    /// for include/skip decisions on each enumerated entry.
+    /// </summary>
+    /// <param name="source">The file or directory to copy. Must not be null.</param>
+    /// <param name="destination">The target path or container directory. Must not be null.</param>
+    /// <param name="policy">
+    /// Conflict policy. Default <see cref="ExistsPolicy.Fail" /> -- any existing file or
+    /// directory at the resolved target throws. See <see cref="MoveTo(MPath, MPath, ExistsPolicy)" />
+    /// for the full per-bit semantics; behavior is identical except the source is left
+    /// in place after the copy.
+    /// </param>
+    /// <param name="filter">
+    /// Optional predicate invoked once per entry encountered during recursive directory
+    /// copy. The argument is the SOURCE-side <see cref="MPath" /> of the entry (file or
+    /// subdirectory). Returning `true` includes the entry; returning `false` skips it
+    /// entirely -- a skipped subdirectory is not traversed. The filter is NOT invoked for
+    /// flat file-to-file copies. The filter cannot rename or remap destinations -- it is
+    /// include/skip only.
+    /// </param>
+    /// <exception cref="ArgumentNullException">`source` or `destination` is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// `policy` combines multiple file behaviors, multiple directory behaviors, or contains
+    /// unknown bits. Thrown before any filesystem state is probed.
+    /// </exception>
+    /// <exception cref="IOException">
+    /// Wrong-kind conflict, fail-on-collision, or an underlying BCL I/O error.
+    /// </exception>
+    /// <exception cref="FileNotFoundException">
+    /// `source` points at a missing file. Surfaced from the BCL `File.Copy` call.
+    /// </exception>
+    /// <remarks>
+    /// The filter is caller-supplied and runs synchronously on the calling thread. It must
+    /// be a pure predicate over the source <see cref="MPath" />; exceptions thrown by the
+    /// filter propagate to the caller and abort the in-progress copy. Filesystem mutations
+    /// performed by the filter are the caller's responsibility.
+    /// <para>
+    /// Same TOCTOU caveat as <see cref="MoveTo(MPath, MPath, ExistsPolicy)" />: the
+    /// destination probe and subsequent copy are not atomic with respect to other
+    /// processes.
+    /// </para>
+    /// </remarks>
+    public static void CopyTo(
+        this MPath source,
+        MPath destination,
+        ExistsPolicy policy = ExistsPolicy.Fail,
+        Func<MPath, bool>? filter = null
+    )
+    {
+        Guard.NotNull(source);
+        Guard.NotNull(destination);
+        ExistsPolicyValidator.Validate(policy, nameof(policy));
+
+        var resolvedDest = ResolveDestination(source, destination);
+
+        if (PathsEqual(source, resolvedDest)) {
+            return;
+        }
+
+        if (Directory.Exists(source.Value)) {
+            CopyDirectoryWithPolicy(source, resolvedDest, policy, filter);
+        } else if (File.Exists(source.Value)) {
+            // Filter is intentionally ignored for flat file-to-file copies (D-25): the
+            // filter applies only to recursive directory operations.
+            CopyFileWithPolicy(source, resolvedDest, policy);
+        } else {
+            // Source missing -- defer to the BCL for the standard exception shape.
+            File.Copy(source.Value, resolvedDest.Value);
+        }
+    }
+
 #endregion
 
 #region Move/copy helpers (shared)
@@ -631,6 +704,112 @@ public static class MPathFileSystemExtensions {
         }
 
         Directory.Delete(path.Value, false);
+    }
+
+    private static void CopyFileWithPolicy(MPath source, MPath dest, ExistsPolicy policy)
+    {
+        dest.EnsureParentExists();
+
+        if (File.Exists(dest.Value)) {
+            if ((policy & ExistsPolicy.FileSkip) != 0) {
+                return;
+            }
+
+            if ((policy & ExistsPolicy.FileOverwrite) != 0) {
+                // The three-arg File.Copy(overwrite: true) overload is available on every
+                // TFM (including netstandard2.1), so no Delete+Copy dance is required.
+                File.Copy(source.Value, dest.Value, true);
+                return;
+            }
+
+            if ((policy & ExistsPolicy.FileOverwriteIfNewer) != 0) {
+                if (File.GetLastWriteTimeUtc(source.Value) > File.GetLastWriteTimeUtc(dest.Value)) {
+                    File.Copy(source.Value, dest.Value, true);
+                }
+
+                return;
+            }
+
+            throw new IOException(
+                $"Cannot copy file '{source.Value}' to '{dest.Value}': destination file already exists. "
+              + "Pass ExistsPolicy.FileOverwrite, ExistsPolicy.FileOverwriteIfNewer, or ExistsPolicy.FileSkip to override."
+            );
+        }
+
+        if (Directory.Exists(dest.Value)) {
+            throw new IOException(
+                $"Cannot copy file '{source.Value}' to '{dest.Value}': a directory exists at the destination. "
+              + "Wrong-kind conflicts are not silently resolved. Delete the directory explicitly and retry."
+            );
+        }
+
+        File.Copy(source.Value, dest.Value);
+    }
+
+    private static void CopyDirectoryWithPolicy(
+        MPath source,
+        MPath dest,
+        ExistsPolicy policy,
+        Func<MPath, bool>? filter
+    )
+    {
+        if (File.Exists(dest.Value)) {
+            // D-20 wrong-kind: directory source onto a file destination.
+            throw new IOException(
+                $"Cannot copy directory '{source.Value}' to '{dest.Value}': a file exists at the destination. "
+              + "Wrong-kind conflicts are not silently resolved. Delete the file explicitly and retry."
+            );
+        }
+
+        if (Directory.Exists(dest.Value)) {
+            if ((policy & ExistsPolicy.DirectoryReplace) != 0) {
+                dest.DeleteDirectory();
+                // Fall through to the fresh-create + recursive walk below.
+            } else if ((policy & ExistsPolicy.DirectoryMerge) != 0) {
+                CopyDirectoryMergeInto(source, dest, policy, filter);
+                return;
+            } else {
+                throw new IOException(
+                    $"Cannot copy directory '{source.Value}' to '{dest.Value}': destination directory already exists. "
+                  + "Pass ExistsPolicy.DirectoryMerge or ExistsPolicy.DirectoryReplace to override."
+                );
+            }
+        }
+
+        dest.EnsureParentExists();
+        dest.CreateDirectory();
+        CopyDirectoryMergeInto(source, dest, policy, filter);
+    }
+
+    private static void CopyDirectoryMergeInto(
+        MPath source,
+        MPath dest,
+        ExistsPolicy policy,
+        Func<MPath, bool>? filter
+    )
+    {
+        foreach (var srcFile in source.EnumerateFiles("*", SearchOption.TopDirectoryOnly)) {
+            if (filter is not null && !filter(srcFile)) {
+                continue;
+            }
+
+            var destFile = dest / srcFile.Name;
+            CopyFileWithPolicy(srcFile, destFile, policy);
+        }
+
+        foreach (var srcSub in source.EnumerateDirectories("*", SearchOption.TopDirectoryOnly)) {
+            if (filter is not null && !filter(srcSub)) {
+                // Skipped directory: do not enter, do not create at the destination.
+                continue;
+            }
+
+            var destSub = dest / srcSub.Name;
+            if (!destSub.DirectoryExists()) {
+                destSub.CreateDirectory();
+            }
+
+            CopyDirectoryMergeInto(srcSub, destSub, policy, filter);
+        }
     }
 
 #endregion
