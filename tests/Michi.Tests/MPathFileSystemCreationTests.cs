@@ -1,4 +1,5 @@
 using Michi.FileSystem;
+using Michi.Tests.Internal;
 using Shouldly;
 using Xunit;
 
@@ -128,7 +129,10 @@ public sealed class MPathFileSystemCreationTests : IDisposable {
     [Fact]
     public void EnsureParentExists_is_noop_at_root()
     {
-        var rootString = Path.GetPathRoot(Environment.SystemDirectory);
+        // Use the current directory's root rather than Environment.SystemDirectory:
+        // on Linux, Environment.SystemDirectory returns string.Empty (CoreCLR convention)
+        // and Path.GetPathRoot("") is null. CWD is always rooted on every host.
+        var rootString = Path.GetPathRoot(Directory.GetCurrentDirectory());
         rootString.ShouldNotBeNull();
 
         var root = MPath.From(rootString);
@@ -224,10 +228,16 @@ public sealed class MPathFileSystemCreationTests : IDisposable {
         Directory.EnumerateFileSystemEntries(target.Value).ShouldBeEmpty();
         // Matching creation times is a best-effort proxy for "same directory" -- a
         // delete-and-recreate cycle would typically produce a new creation timestamp on
-        // platforms that track it (Windows/macOS). On some Linux filesystems ctime is not
-        // tracked or is reused; the main guarantee is enforced by source-level acceptance
-        // criteria (no Directory.Delete on the root).
-        after.ShouldBe(before);
+        // platforms that track it (Windows/macOS). On Linux, DirectoryInfo.CreationTimeUtc
+        // is filesystem-dependent: ext4 historically does not track birthtime, and .NET
+        // falls back to ctime/mtime, which DO change when files are deleted from the
+        // directory. So we skip this proxy on Linux. The stronger contract (root is NOT
+        // delete-and-recreated) is enforced in the source by not calling Directory.Delete
+        // on the root and verified in acceptance by grep.
+        if (!PlatformTestHelpers.IsLinux)
+        {
+            after.ShouldBe(before);
+        }
     }
 
     [Fact]
