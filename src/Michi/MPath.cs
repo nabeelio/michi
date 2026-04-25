@@ -493,6 +493,13 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// <summary>
     /// Non-throwing parent lookup. Returns `false` at root.
     /// </summary>
+    /// <param name="parent">
+    /// On success, receives the parent <see cref="MPath" />. On failure (this path is a
+    /// root) receives `null`.
+    /// </param>
+    /// <returns>
+    /// `true` if a parent was produced; `false` when this path is a root and has no parent.
+    /// </returns>
     public bool TryGetParent(out MPath? parent)
     {
         if (_path == Root) {
@@ -615,6 +622,15 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// Joins `segments` beneath this path in order. Normalizes once at the end.
     /// Null or empty segments are skipped.
     /// </summary>
+    /// <param name="segments">
+    /// Zero or more relative segments to append. Null or empty segments are skipped.
+    /// Leading separators on each segment are stripped, so segments are always treated
+    /// as relative.
+    /// </param>
+    /// <returns>
+    /// A new <see cref="MPath" /> with the segments appended and re-normalized. Returns
+    /// this instance unchanged if `segments` is null, empty, or contains only null/empty entries.
+    /// </returns>
     public MPath Join(params string[]? segments)
     {
         if (segments is null || segments.Length == 0) {
@@ -849,6 +865,14 @@ public sealed class MPath : IEquatable<MPath>, IComparable<MPath> {
     /// not `.` or `..`, free of platform-invalid segment characters, and on Windows not a
     /// reserved device name or a segment ending in `.` / space.
     /// </summary>
+    /// <param name="name">
+    /// The new final segment for the returned path. Must be a non-empty single segment
+    /// (no separators, no `.`/`..`, no platform-invalid characters).
+    /// </param>
+    /// <returns>
+    /// A new <see cref="MPath" /> sharing this path's parent chain but with its final
+    /// segment replaced by `name`.
+    /// </returns>
     /// <exception cref="ArgumentNullException">
     /// `name` is null.
     /// </exception>

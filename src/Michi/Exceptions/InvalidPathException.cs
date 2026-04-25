@@ -9,6 +9,10 @@ namespace Michi.Exceptions;
 /// versions. Consumers may regex against it, so message changes are minor-version-breaking.
 /// </remarks>
 public sealed class InvalidPathException : MPathException {
+    /// <summary>
+    /// Constructs a new <see cref="InvalidPathException" /> for a path that failed
+    /// normalization, capturing the attempted path string and a short rejection reason.
+    /// </summary>
     /// <param name="attemptedPath">The path string that was rejected, preserved as-is.</param>
     /// <param name="reason">Short human-readable reason, a sentence fragment.</param>
     /// <exception cref="ArgumentNullException">
@@ -30,6 +34,10 @@ public sealed class InvalidPathException : MPathException {
                  );
     }
 
+    /// <summary>
+    /// Constructs a new <see cref="InvalidPathException" /> for a path that failed
+    /// normalization due to an underlying exception.
+    /// </summary>
     /// <param name="attemptedPath">The path string that was rejected.</param>
     /// <param name="reason">Short human-readable reason.</param>
     /// <param name="innerException">The exception that caused the rejection.</param>
