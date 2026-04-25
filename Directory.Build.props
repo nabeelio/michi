@@ -27,6 +27,7 @@
     <PackageTags>path;filesystem;mpath;absolute-path</PackageTags>
     <Copyright>Copyright (c) Nabeel Shahzad</Copyright>
     <Description>Strongly-typed absolute path type for .NET. Immutable, normalized, cross-platform.</Description>
+    <PackageReleaseNotes>https://github.com/nabeelio/Michi/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
