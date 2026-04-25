@@ -3,12 +3,7 @@ name: Release
 # Triggered by pushing a tag matching v* (e.g., v1.0.0, v1.0.0-beta.1).
 # MinVer (configured in Directory.Build.props) interprets the tag as the
 # package version: v1.2.3 -> 1.2.3, v1.0.0-beta.1 -> 1.0.0-beta.1.
-#
-# Multi-package future: the workflow already packs every <IsPackable>true</IsPackable>
-# project in Michi.slnx at the same version, but the SBOM step still targets
-# src/Michi/Michi.csproj explicitly. Adding a sibling package therefore requires
-# at least updating the SBOM generation, and independent package releases would
-# still need the per-package-tag migration described in docs/development.md.
+
 on:
   push:
     tags: ['v*']
@@ -125,21 +120,28 @@ jobs:
             --api-key "${{ secrets.GITHUB_TOKEN }}" `
             --skip-duplicate
 
-      - name: Publish to NuGet.org
-        shell: pwsh
-        run: |
-          dotnet nuget push "./artifacts/*.nupkg" `
-            --source "https://api.nuget.org/v3/index.json" `
-            --api-key "${{ secrets.NUGET_API_KEY }}" `
-            --skip-duplicate
+      # === NuGet.org publication deferred to 1.0 milestone ===
+      # Per .planning/phases/05-release-engineering/05-CONTEXT.md D-05 / D-06.
+      # 0.1.0 publishes to GitHub Packages only while the API surface is still
+      # reshaping under 0.y.z SemVer semantics. Uncomment the two steps below
+      # at the 1.0 cut; no other changes needed -- the secret and tooling
+      # are already wired.
 
-      - name: Publish symbols to NuGet.org
-        shell: pwsh
-        run: |
-          dotnet nuget push "./artifacts/*.snupkg" `
-            --source "https://api.nuget.org/v3/index.json" `
-            --api-key "${{ secrets.NUGET_API_KEY }}" `
-            --skip-duplicate
+      # - name: Publish to NuGet.org
+      #   shell: pwsh
+      #   run: |
+      #     dotnet nuget push "./artifacts/*.nupkg" `
+      #       --source "https://api.nuget.org/v3/index.json" `
+      #       --api-key "${{ secrets.NUGET_API_KEY }}" `
+      #       --skip-duplicate
+
+      # - name: Publish symbols to NuGet.org
+      #   shell: pwsh
+      #   run: |
+      #     dotnet nuget push "./artifacts/*.snupkg" `
+      #       --source "https://api.nuget.org/v3/index.json" `
+      #       --api-key "${{ secrets.NUGET_API_KEY }}" `
+      #       --skip-duplicate
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
