@@ -214,6 +214,74 @@ var file = MPath.From("data/settings.json", opts);
 var homeConfig = MPath.From("~/.config/myapp/settings.json", opts);
 ```
 
+## Filesystem operations
+
+Opt in with `using Michi.FileSystem;` for filesystem extension methods on `MPath`.
+
+### Existence
+
+```csharp
+using Michi.FileSystem;
+
+var config = MPath.Home / ".config" / "myapp.json";
+
+config.FileExists();       // true only if a FILE exists at this path
+config.DirectoryExists();  // true only if a DIRECTORY exists at this path
+```
+
+There is no bare `Exists()`. Asking "is there a file here?" and "is there a directory
+here?" are different questions, and Michi makes you pick at the call site — kind-mismatch
+bugs surface at write-time instead of runtime.
+
+### Creation
+
+```csharp
+var cache = MPath.LocalApplicationData / "myapp" / "cache";
+
+cache.CreateDirectory();       // idempotent, creates intermediates
+cache.EnsureParentExists();    // creates missing parent only, returns self for chaining
+```
+
+### Enumeration (lazy)
+
+```csharp
+foreach (var log in logs.EnumerateFiles("*.log", SearchOption.AllDirectories))
+{
+    Console.WriteLine(log);
+}
+
+foreach (var sub in projectRoot.EnumerateDirectories("src*", SearchOption.TopDirectoryOnly))
+{
+    Console.WriteLine(sub);
+}
+```
+
+Returns `IEnumerable<MPath>`, so LINQ works and you can break early without materializing
+the full list.
+
+### Move, copy, and conflict policy
+
+```csharp
+src.MoveTo(dst, ExistsPolicy.Fail);                     // default: throw on collision
+src.MoveTo(dst, ExistsPolicy.MergeAndSkip);             // keep target on collision
+src.MoveTo(dst, ExistsPolicy.MergeAndOverwrite);        // target wins
+src.CopyTo(dst, ExistsPolicy.MergeAndOverwriteIfNewer); // newest wins
+```
+
+`MoveTo` and `CopyTo` auto-create the target parent directory if missing. `DeleteFile`
+and `DeleteDirectory` are idempotent no-ops if the target is already gone.
+
+### Advanced
+
+Advanced usage lives in the test suite — tests are the executable cookbook:
+
+- `MoveTo` / `CopyTo` overload matrix, dir-into-dir resolution, same-path no-op →
+  `tests/Michi.Tests/MPathFileSystemMoveTests.cs` and `MPathFileSystemCopyTests.cs`
+- Deletion edge cases (recursive, wrong-kind errors, already-gone idempotency) →
+  `tests/Michi.Tests/MPathFileSystemDeletionTests.cs`
+- `System.IO` interop (`ToFileInfo`, `ToDirectoryInfo`) →
+  `tests/Michi.Tests/MPathFileSystemInteropTests.cs`
+
 ## Serialization
 
 JSON, `IConfiguration` binding, and ASP.NET model binding are deferred until
