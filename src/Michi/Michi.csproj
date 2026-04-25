@@ -6,6 +6,12 @@
     <PackageId>Michi</PackageId>
     <Title>Michi</Title>
     <IsPackable>true</IsPackable>
+    <!-- Declare AOT/trim compatibility. No-op on netstandard2.1; on net8.0 and net10.0
+         this implicitly enables the trim analyzer (IL2xxx), single-file analyzer (IL3xxx),
+         and AOT analyzer (IL3050/IL3051). MPath is pure string manipulation with no
+         reflection or dynamic code, so zero findings are expected. The property declares
+         to consumers that Michi is safe to include in trim-published / AOT-compiled apps. -->
+    <IsAotCompatible>true</IsAotCompatible>
     <!-- Preserve [Pure] attribute emission. System.Diagnostics.Contracts.PureAttribute is
          decorated with [Conditional("CONTRACTS_FULL")], which means the C# compiler strips
          it from call sites when the symbol is NOT defined. Defining it here keeps the
