@@ -78,17 +78,22 @@ public sealed class AppPaths
         Data = root / "data";
         Logs = root / "logs";
         Cache = MPath.LocalApplicationData / "myapp" / "cache";
-        
-        // TODO: Add examples of ensuring the above dirs exist
-        Cache.CreateOrEmpty();
+
+        // Ensure the directories exist before any consumer calls UserDatabase().
+        // Requires `using Michi.FileSystem;` — the FS extensions live there.
+        Data.CreateDirectory();
+        Logs.CreateDirectory();
+        Cache.CreateDirectory();
     }
 
     public MPath Data { get; }
     public MPath Logs { get; }
     public MPath Cache { get; }
 
-    // Get a path for someone's storage
-    public MPath UserDatabase(string profile) => Cache / profile / "data.sqlite";
+    // Build a per-profile DB path; EnsureParentExists creates the
+    // profile-scoped Cache subdir if a new profile shows up.
+    public MPath UserDatabase(string profile) =>
+        (Cache / profile / "data.sqlite").EnsureParentExists();
 }
 
 var paths = new AppPaths(MPath.InstalledDirectory);
@@ -273,7 +278,9 @@ and `DeleteDirectory` are idempotent no-ops if the target is already gone.
 
 ### Advanced
 
-Advanced usage lives in the test suite — tests are the executable cookbook:
+Advanced usage lives in the test suite — tests are the executable cookbook,
+for filesystem operations and for the lexical / equality machinery that
+underpins them:
 
 - `MoveTo` / `CopyTo` overload matrix, dir-into-dir resolution, same-path no-op →
   `tests/Michi.Tests/MPathFileSystemMoveTests.cs` and `MPathFileSystemCopyTests.cs`
@@ -281,6 +288,12 @@ Advanced usage lives in the test suite — tests are the executable cookbook:
   `tests/Michi.Tests/MPathFileSystemDeletionTests.cs`
 - `System.IO` interop (`ToFileInfo`, `ToDirectoryInfo`) →
   `tests/Michi.Tests/MPathFileSystemInteropTests.cs`
+- Containment / `ResolveContained` and `TryResolveContained` for ZIP-slip
+  defense, lexical-escape rejection, drive-letter and UNC traversal blocks →
+  `tests/Michi.Tests/MPathContainmentTests.cs`
+- Platform case-sensitivity — Windows/macOS case-insensitive equality and
+  hashing vs Linux case-sensitive equality, with `PlatformTestHelpers` gating →
+  `tests/Michi.Tests/MPathEqualityTests.cs`
 
 ## Serialization
 
