@@ -112,13 +112,18 @@ jobs:
             --azure-key-vault-url "${{ secrets.KEY_VAULT_URL }}" `
             --azure-key-vault-certificate "${{ secrets.KEY_VAULT_CERT_NAME }}"
 
+      # `dotnet nuget push` does not shell-expand wildcards on Windows + pwsh:
+      # passing `"./artifacts/*.nupkg"` literally yields `File does not exist`
+      # (NuGet/Home#4393). Resolve the glob in PowerShell and push each file.
       - name: Publish to GitHub Packages
         shell: pwsh
         run: |
-          dotnet nuget push "./artifacts/*.nupkg" `
-            --source "https://nuget.pkg.github.com/nabeelio/index.json" `
-            --api-key "${{ secrets.GITHUB_TOKEN }}" `
-            --skip-duplicate
+          Get-ChildItem ./artifacts/*.nupkg | ForEach-Object {
+            dotnet nuget push $_.FullName `
+              --source "https://nuget.pkg.github.com/nabeelio/index.json" `
+              --api-key "${{ secrets.GITHUB_TOKEN }}" `
+              --skip-duplicate
+          }
 
       # === NuGet.org publication deferred to 1.0 milestone ===
       # Per .planning/phases/05-release-engineering/05-CONTEXT.md D-05 / D-06.
@@ -130,18 +135,22 @@ jobs:
       # - name: Publish to NuGet.org
       #   shell: pwsh
       #   run: |
-      #     dotnet nuget push "./artifacts/*.nupkg" `
-      #       --source "https://api.nuget.org/v3/index.json" `
-      #       --api-key "${{ secrets.NUGET_API_KEY }}" `
-      #       --skip-duplicate
+      #     Get-ChildItem ./artifacts/*.nupkg | ForEach-Object {
+      #       dotnet nuget push $_.FullName `
+      #         --source "https://api.nuget.org/v3/index.json" `
+      #         --api-key "${{ secrets.NUGET_API_KEY }}" `
+      #         --skip-duplicate
+      #     }
 
       # - name: Publish symbols to NuGet.org
       #   shell: pwsh
       #   run: |
-      #     dotnet nuget push "./artifacts/*.snupkg" `
-      #       --source "https://api.nuget.org/v3/index.json" `
-      #       --api-key "${{ secrets.NUGET_API_KEY }}" `
-      #       --skip-duplicate
+      #     Get-ChildItem ./artifacts/*.snupkg | ForEach-Object {
+      #       dotnet nuget push $_.FullName `
+      #         --source "https://api.nuget.org/v3/index.json" `
+      #         --api-key "${{ secrets.NUGET_API_KEY }}" `
+      #         --skip-duplicate
+      #     }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
