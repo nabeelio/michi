@@ -11,6 +11,9 @@ namespace Michi.Exceptions;
 public sealed class InvalidPathException : MPathException {
     /// <param name="attemptedPath">The path string that was rejected, preserved as-is.</param>
     /// <param name="reason">Short human-readable reason, a sentence fragment.</param>
+    /// <exception cref="ArgumentNullException">
+    /// `attemptedPath` or `reason` is null.
+    /// </exception>
     public InvalidPathException(string attemptedPath, string reason)
             : base($"Invalid path '{attemptedPath}': {reason}.")
     {
@@ -30,6 +33,9 @@ public sealed class InvalidPathException : MPathException {
     /// <param name="attemptedPath">The path string that was rejected.</param>
     /// <param name="reason">Short human-readable reason.</param>
     /// <param name="innerException">The exception that caused the rejection.</param>
+    /// <exception cref="ArgumentNullException">
+    /// `attemptedPath` or `reason` is null.
+    /// </exception>
     public InvalidPathException(string attemptedPath, string reason, Exception innerException)
             : base($"Invalid path '{attemptedPath}': {reason}.", innerException)
     {

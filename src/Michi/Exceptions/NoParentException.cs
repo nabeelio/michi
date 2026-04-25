@@ -7,6 +7,7 @@ namespace Michi.Exceptions;
 public sealed class NoParentException : MPathException {
     /// <summary>Creates a <see cref="NoParentException" /> with a default "no parent at root" message.</summary>
     /// <param name="path">The path that has no parent.</param>
+    /// <exception cref="ArgumentNullException">`path` is null.</exception>
     public NoParentException(MPath path)
             : base($"Path '{path}' has no parent (already at root).")
     {
@@ -23,6 +24,7 @@ public sealed class NoParentException : MPathException {
     /// Custom message. Used by <see cref="MPath.Up(int)" /> to include both the requested ascent
     /// count and the actual depth.
     /// </param>
+    /// <exception cref="ArgumentNullException">`path` is null.</exception>
     public NoParentException(MPath path, string message) : base(message)
     {
         Path = path ?? throw new ArgumentNullException(nameof(path));
