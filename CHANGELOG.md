@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-25
+
+### Changed
+
+- Refresh `PackageTags` metadata: drop legacy `mpath` token left over from the
+  Michi → Segments rebrand, broaden the keyword set so the package is
+  discoverable on NuGet.org search.
+
 ## [0.1.0] - 2026-04-25
 
 First public release. Segments ships the `SPath` type — a strongly-typed, immutable, normalized absolute-path value object for .NET — to GitHub Packages.
 
-[Unreleased]: https://github.com/nabeelio/Segments/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/nabeelio/Segments/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/nabeelio/Segments/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/nabeelio/Segments/releases/tag/v0.1.0

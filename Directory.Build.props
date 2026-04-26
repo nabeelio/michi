@@ -24,7 +24,7 @@
     <RepositoryUrl>https://github.com/nabeelio/segments</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>path;filesystem;mpath;absolute-path</PackageTags>
+    <PackageTags>path;paths;filesystem;io;absolute-path;spath;normalized;immutable;cross-platform</PackageTags>
     <Copyright>Copyright (c) Nabeel Shahzad</Copyright>
     <Description>Strongly-typed absolute path type for .NET. Immutable, normalized, cross-platform.</Description>
     <PackageReleaseNotes>https://github.com/nabeelio/Segments/blob/main/CHANGELOG.md</PackageReleaseNotes>
