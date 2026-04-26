@@ -27,7 +27,7 @@
 
   <!-- Library runtime dependencies for older TFMs. System.Text.Json and
        System.Collections.Immutable are in-box on net6+ but ship as packages for
-       netstandard2.1. Referenced conditionally in src/Michi/Michi.csproj. -->
+       netstandard2.1. Referenced conditionally in src/Segments/Segments.csproj. -->
   <ItemGroup>
     <PackageVersion Include="System.Text.Json" Version="10.0.6" />
     <PackageVersion Include="System.Collections.Immutable" Version="10.0.6" />
@@ -36,7 +36,7 @@
   <!-- Source-only polyfills for modern C# features (CallerArgumentExpression, IsExternalInit,
        nullability annotations, etc.) so we can use latest C# on netstandard2.1 without
        hand-rolling per-attribute polyfill files. Consumed build-time only via PrivateAssets=all
-       in src/Michi/Michi.csproj. Does not appear in consumer dependency graphs. -->
+       in src/Segments/Segments.csproj. Does not appear in consumer dependency graphs. -->
   <ItemGroup>
     <PackageVersion Include="PolySharp" Version="1.15.0" />
   </ItemGroup>

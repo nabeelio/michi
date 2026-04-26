@@ -1,0 +1,19 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<!-- Public API members (exception properties, init-only setters on public records) are
+	     consumed by library users, not by this solution's own code. ReSharper's
+	     "Global" variants flag these as unused; that's a false positive for library projects. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=UnusedAutoPropertyAccessor_002EGlobal/@EntryIndexedValue">DO_NOT_SHOW</s:String>
+	<!-- Converters return nullable types to match the base-class signatures (JsonConverter.Read,
+	     TypeConverter.ConvertFrom/ConvertTo). ReSharper suggests making them non-nullable but
+	     that would narrow the contract. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ReturnTypeCanBeNotNullable/@EntryIndexedValue">DO_NOT_SHOW</s:String>
+	<!-- netstandard2.1's TypeConverter base signature uses different nullability annotations than
+	     net8+. Bridging both from one source triggers false-positive nullability warnings. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=NullnessAnnotationConflictWithJetBrainsAnnotations/@EntryIndexedValue">DO_NOT_SHOW</s:String>
+	<!-- SPathException is a public base class; its constructors MUST remain public so consumers
+	     can throw the base type directly and subclass outside the Segments assembly. ReSharper
+	     suggests `protected` because nothing inside Segments instantiates the base class, but that
+	     would be a SemVer break. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MemberCanBeProtected_002EGlobal/@EntryIndexedValue">DO_NOT_SHOW</s:String>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=Segments/@EntryIndexedValue">True</s:Boolean>
+	</wpf:ResourceDictionary>

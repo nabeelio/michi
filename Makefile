@@ -1,7 +1,7 @@
 DOTNET ?= dotnet
-SOLUTION ?= Michi.slnx
-TEST_PROJECT ?= tests/Michi.Tests/Michi.Tests.csproj
-PACK_PROJECT ?= src/Michi/Michi.csproj
+SOLUTION ?= Segments.slnx
+TEST_PROJECT ?= tests/Segments.Tests/Segments.Tests.csproj
+PACK_PROJECT ?= src/Segments/Segments.csproj
 ARTIFACTS_DIR ?= ./artifacts
 INSPECT_OUTPUT ?= /tmp/inspect.xml
 
@@ -23,7 +23,7 @@ test: ## Run the test project in Release mode
 	$(MAKE) build
 	$(DOTNET) test $(TEST_PROJECT) -c Release --no-build --nologo
 
-pack: ## Pack the Michi project into ./artifacts
+pack: ## Pack the Segments project into ./artifacts
 	$(MAKE) build
 	$(DOTNET) pack $(PACK_PROJECT) -c Release --no-build --nologo --output $(ARTIFACTS_DIR)
 

@@ -20,14 +20,14 @@
     <Authors>Nabeel Shahzad</Authors>
     <Company>vmslabs</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/nabeelio/michi</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/nabeelio/michi</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/nabeelio/segments</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nabeelio/segments</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>path;filesystem;mpath;absolute-path</PackageTags>
     <Copyright>Copyright (c) Nabeel Shahzad</Copyright>
     <Description>Strongly-typed absolute path type for .NET. Immutable, normalized, cross-platform.</Description>
-    <PackageReleaseNotes>https://github.com/nabeelio/Michi/blob/main/CHANGELOG.md</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/nabeelio/Segments/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
