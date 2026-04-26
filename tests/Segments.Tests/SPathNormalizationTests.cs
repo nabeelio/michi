@@ -214,8 +214,12 @@ public class SPathNormalizationTests {
         p.ToUnixString().ShouldBe("/opt/app/data/files");
     }
 
+    // NOTE: We do not test [InlineData("")] here because Environment.SetEnvironmentVariable(name, "")
+    // is documented to remove the variable on .NET (and does so on .NET 8 / Linux), so the resulting
+    // expansion would hit the "variable not set" error path instead of the "empty expanded path" path.
+    // .NET 10 keeps the empty value, but the test must be portable across all supported TFMs.
+    // Whitespace-only ("   ") exercises the same empty-after-trim rejection logic and IS portable.
     [Theory]
-    [InlineData("")]
     [InlineData("   ")]
     public void Normalization_EnvVarExpansion_RejectsEmptyExpandedPath(string value)
     {
