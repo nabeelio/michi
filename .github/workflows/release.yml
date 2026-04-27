@@ -107,7 +107,7 @@ jobs:
         run: dotnet tool run dotnet-CycloneDX src/Segments/Segments.csproj --output ./artifacts --filename segments.cyclonedx.json --output-format Json
 
       - name: Azure OIDC login
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
