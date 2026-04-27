@@ -45,9 +45,10 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Packaged README surfaces on nuget.org. Optional until the file exists. -->
+  <!-- Packaged README surfaces on nuge: t.org. Optional until the file exists. -->
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)../../README.md" Pack="true" PackagePath="/" Condition="Exists('$(MSBuildThisFileDirectory)../../README.md')" />
+    <None Include="$(MSBuildThisFileDirectory)../../images/segments-dark-128.png" Pack="true" PackagePath="/images" Condition="Exists('$(MSBuildThisFileDirectory)../../images/segments-dark-128.png')" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Extensions\" />
