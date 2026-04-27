@@ -4,6 +4,7 @@
     <TargetFrameworks>netstandard2.1;net8.0;net10.0</TargetFrameworks>
     <RootNamespace>Segments</RootNamespace>
     <PackageId>Segments</PackageId>
+    <PackageIcon>images/segments-dark-128.png</PackageIcon>
     <Title>Segments</Title>
     <IsPackable>true</IsPackable>
     <!-- Declare AOT/trim compatibility. No-op on netstandard2.1; on net8.0 and net10.0
